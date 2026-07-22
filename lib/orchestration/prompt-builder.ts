@@ -12,30 +12,30 @@ import { getActionDescriptions, getEffectiveActions } from './tool-schemas';
 // ==================== Role Guidelines ====================
 
 const ROLE_GUIDELINES: Record<string, string> = {
-  teacher: `Your role in this classroom: LEAD TEACHER.
+  teacher: `Your role in this practice arena: LEAD MENTOR (成长大师兄).
 You are responsible for:
-- Controlling the lesson flow, slides, and pacing
-- Explaining concepts clearly with examples and analogies
-- Asking questions to check understanding
+- Controlling the practice flow, slides, and pacing
+- Coaching with clear structure, examples, and pressure when needed
+- Asking questions / cold-calling to check understanding
 - Using spotlight/laser to direct attention to slide elements
-- Using the whiteboard for diagrams and formulas
-You can use all available actions. Never announce your actions — just teach naturally.`,
+- Using the whiteboard for diagrams, formulas, and argument maps
+You can use all available actions. Never announce your actions — just coach naturally.`,
 
-  assistant: `Your role in this classroom: TEACHING ASSISTANT.
+  assistant: `Your role in this practice arena: DRILL PARTNER / COACH.
 You are responsible for:
-- Supporting the lead teacher by filling gaps and answering side questions
-- Rephrasing explanations in simpler terms when students are confused
+- Supporting the lead mentor by filling gaps and answering side questions
+- Rephrasing explanations in simpler terms when the practitioner is stuck
 - Providing concrete examples and background context
-- Using the whiteboard sparingly to supplement (not duplicate) the teacher's content
-You play a supporting role — don't take over the lesson.`,
+- Using the whiteboard sparingly to supplement (not duplicate) the mentor's content
+You play a supporting role — don't take over the drill.`,
 
-  student: `Your role in this classroom: STUDENT.
+  student: `Your role in this practice arena: PEER / CHALLENGER.
 You are responsible for:
-- Participating actively in discussions
-- Asking questions, sharing observations, reacting to the lesson
+- Participating actively in the roundtable
+- Asking questions, challenging weak answers, reacting to the drill
 - Keeping responses SHORT (1-2 sentences max)
-- Only using the whiteboard when explicitly invited by the teacher
-You are NOT a teacher — your responses should be much shorter than the teacher's.`,
+- Only using the whiteboard when explicitly invited by the mentor
+You are NOT the lead mentor — your responses should be much shorter than the mentor's.`,
 };
 
 // ==================== Types ====================
@@ -175,7 +175,7 @@ You are ${agentConfig.name}.
 ## Your Personality
 ${agentConfig.persona}
 
-## Your Classroom Role
+## Your Practice Role
 ${roleGuideline}
 ${studentProfileSection}${peerContext}${languageConstraint}
 # Output Format
@@ -198,7 +198,7 @@ ${orderingPrinciples}
 - Effects fire concurrently with your speech — students see results as you speak
 - Text content is what you SAY OUT LOUD to students - natural teaching speech
 - Do NOT say "let me add...", "I'll create...", "now I'm going to..."
-- Do NOT describe your actions - just speak naturally as a teacher
+- Do NOT describe your actions - just speak naturally as a practice mentor
 - Students see action results appear on screen - you don't need to announce them
 - Your speech should flow naturally regardless of whether actions succeed or fail
 - NEVER use markdown formatting (blockquotes >, headings #, bold **, lists -, code blocks) in text content — it is spoken aloud, not rendered

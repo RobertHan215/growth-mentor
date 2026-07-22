@@ -48,10 +48,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="w-full max-w-md p-8 space-y-8 bg-white dark:bg-slate-800 rounded-2xl shadow-xl">
         <div className="text-center">
-          <img src="/logo-horizontal.png" alt="易鑫大学堂" className="h-20 w-auto mx-auto mb-4" />
+          <img src="/logo-horizontal.png" alt="成长大师兄" className="h-20 w-auto mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">欢迎登录</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-            易鑫大学堂 - AI互动课堂平台
+            成长大师兄 · AI 对练场
           </p>
         </div>
 

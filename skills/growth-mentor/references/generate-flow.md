@@ -14,7 +14,7 @@
 
 ## Requirement-Only Generation
 
-If the user has already clearly asked to generate the classroom and the preconditions are satisfied, submit the generation job immediately. Do not ask for a second confirmation just before calling `/api/generate-classroom`.
+If the user has already clearly asked to generate the practice session and the preconditions are satisfied, submit the generation job immediately. Do not ask for a second confirmation just before calling `/api/generate-classroom`.
 
 Submit the job with:
 
@@ -26,7 +26,7 @@ Request body:
 
 ```json
 {
-  "requirement": "Create an introductory classroom on quantum mechanics for high school students"
+  "requirement": "Create an introductory practice session on quantum mechanics for high school students"
 }
 ```
 
@@ -41,7 +41,7 @@ Only send supported content fields:
 - optional `enableTTS` (boolean) — enable server-side TTS audio generation for speech actions
 - optional `agentMode` (`"default"` | `"generate"`) — controls agent profile strategy:
   - `"default"` (or omitted): uses built-in default agents
-  - `"generate"`: uses LLM to generate custom agent profiles tailored to the course content
+  - `"generate"`: uses LLM to generate custom agent profiles tailored to the practice brief
 
 All optional boolean fields default to `false` when omitted. Omitting them preserves backward compatibility.
 
@@ -107,7 +107,7 @@ After the job is submitted:
 GET {pollUrl}
 ```
 
-4. Prefer a conservative polling cadence of about 60 seconds between polls for classroom generation jobs, even if `pollIntervalMs` is shorter.
+4. Prefer a conservative polling cadence of about 60 seconds between polls for practice generation jobs, even if `pollIntervalMs` is shorter.
 5. Treat `queued` and `running` as in-progress states.
 6. Stop only when `status` becomes `succeeded` or `failed`.
 
@@ -125,12 +125,12 @@ GET {pollUrl}
 
 ## If The Loop Ends First
 
-If the job is still running when you stop active polling for this turn, tell the user that the classroom generation is still running in the background and invite them to come back a little later to continue checking the same job.
+If the job is still running when you stop active polling for this turn, tell the user that the practice generation is still running in the background and invite them to come back a little later to continue checking the same job.
 
 Use natural phrasing such as:
 
 ```text
-The classroom generation is still running in the background.
+The practice generation is still running in the background.
 Job ID: abc123
 
 Check back with me in a little while and I can continue tracking this same job without starting over.
@@ -138,7 +138,7 @@ Check back with me in a little while and I can continue tracking this same job w
 
 ## What To Return
 
-Return the generated classroom ID plus a directly clickable classroom URL.
+Return the generated practice session ID plus a directly clickable practice URL.
 
 Output the URL as a raw absolute URL on its own line.
 
@@ -153,8 +153,8 @@ Do not wrap the URL in:
 Use a compact format like:
 
 ```text
-Classroom ID: Uyh82Y32ZK
-Classroom URL:
+Practice ID: Uyh82Y32ZK
+Practice URL:
 http://localhost:3001/classroom/Uyh82Y32ZK
 ```
 
@@ -167,4 +167,4 @@ If the error suggests a provider or model configuration problem, explicitly tell
 ## Confirmation Requirements
 
 - Ask before reading a local PDF.
-- Do not ask for a second confirmation before the generation request if the user has already clearly asked you to generate the classroom.
+- Do not ask for a second confirmation before the generation request if the user has already clearly asked you to generate the practice session.

@@ -94,13 +94,13 @@ This is a student-initiated discussion, not a Q&A session.\n`
   const studentProfileSection =
     userProfile?.nickname || userProfile?.bio
       ? `
-# Student Profile
-Student name: ${userProfile.nickname || 'Unknown'}
+# Practitioner Profile
+Name: ${userProfile.nickname || 'Unknown'}
 ${userProfile.bio ? `Background: ${userProfile.bio}` : ''}
 `
       : '';
 
-  return `You are the Director of a multi-agent classroom. Your job is to decide which agent should speak next based on the conversation context.
+  return `You are the Director of a multi-agent practice arena (成长大师兄). Your job is to decide which agent should speak next based on the conversation context.
 
 # Available Agents
 ${agentList}
@@ -126,7 +126,7 @@ ${rule1}
 - ROLE DIVERSITY: Do NOT dispatch two agents of the same role consecutively. After a teacher speaks, the next should be a student or assistant — not another teacher-like response. After an assistant rephrases, dispatch a student who asks a question, not another assistant who also rephrases.
 - CONTENT DEDUP: Read the "Agents Who Already Spoke" previews carefully. If an agent already explained a concept thoroughly, do NOT dispatch another agent to explain the same concept. Instead, dispatch an agent who will ASK a question, CHALLENGE an assumption, CONNECT to another topic, or TAKE NOTES.
 - DISCUSSION PROGRESSION: Each new agent should advance the conversation. Good progression: explain → question → deeper explanation → different perspective → summary. Bad progression: explain → re-explain → rephrase → paraphrase.
-- GREETING RULE: If any agent has already greeted the students, no subsequent agent should greet again. Check the previews for greetings.
+- GREETING RULE: If any agent has already greeted the practitioner, no subsequent agent should greet again. Check the previews for greetings.
 
 # Output Format
 You MUST output ONLY a JSON object, nothing else:

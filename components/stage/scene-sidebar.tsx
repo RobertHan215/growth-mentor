@@ -128,7 +128,7 @@ export function SceneSidebar({
           >
             <img
               src="/logo-horizontal.png"
-              alt="易鑫大学堂"
+              alt="成长大师兄"
               className="h-12 w-auto object-contain"
             />
           </button>

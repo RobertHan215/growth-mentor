@@ -228,8 +228,8 @@ export const stageEnUS = {
     startRecording: 'Start recording',
   },
   pbl: {
-    legacyFormat: 'This PBL scene uses a legacy format. Please regenerate the course.',
-    emptyProject: 'PBL project has not been generated yet. Please create via course generation.',
+    legacyFormat: 'This PBL scene uses a legacy format. Please regenerate the practice.',
+    emptyProject: 'PBL project has not been generated yet. Please create via practice generation.',
     roleSelection: {
       title: 'Choose Your Role',
       description: 'Select a role to start collaborating on the project',

@@ -117,7 +117,7 @@ providers:
     apiKey: sk-...
 ```
 
-If using a non-default provider for classroom generation, also set the model selection explicitly:
+If using a non-default provider for practice generation, also set the model selection explicitly:
 
 ```env
 DEFAULT_MODEL=google:gemini-3-flash-preview
@@ -156,7 +156,7 @@ These features require additional provider keys beyond the core LLM provider. As
 | Video Generation | `VIDEO_SEEDANCE_API_KEY`, `VIDEO_KLING_API_KEY`, `VIDEO_VEO_API_KEY`, `VIDEO_SORA_API_KEY` | Generates short videos (any one suffices) |
 | TTS | `TTS_OPENAI_API_KEY`, `TTS_AZURE_API_KEY`, `TTS_GLM_API_KEY`, `TTS_QWEN_API_KEY` | Text-to-speech narration (any one suffices) |
 
-These are all optional. The classroom generation works without them — they only unlock richer content.
+These are all optional. The practice generation works without them — they only unlock richer content.
 
 Alternatively, configure via `server-providers.yml`:
 

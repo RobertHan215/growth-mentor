@@ -114,15 +114,16 @@ async function generateAgentProfiles(
   aiCall: AICallFn,
 ): Promise<AgentInfo[]> {
   const systemPrompt =
-    'You are an expert instructional designer. Generate agent profiles for a multi-agent classroom simulation. Return ONLY valid JSON, no markdown or explanation.';
+    'You are an expert practice-session designer for 成长大师兄 (GrowthMentor). Generate agent profiles for a multi-agent practice arena. Return ONLY valid JSON, no markdown or explanation.';
 
-  const userPrompt = `Generate agent profiles for a course with this requirement:
+  const userPrompt = `Generate agent profiles for a practice session with this brief:
 ${requirement}
 
 Requirements:
-- Decide the appropriate number of agents based on the course content (typically 3-5)
-- Exactly 1 agent must have role "teacher", the rest can be "assistant" or "student"
-- Each agent needs: name, role, persona (2-3 sentences describing personality and teaching/learning style)
+- Decide the appropriate number of agents based on the practice scenario (typically 3-5)
+- Exactly 1 agent must have role "teacher" (the lead mentor / 成长大师兄), the rest can be "assistant" or "student"
+- Each agent needs: name, role, persona (2-3 sentences describing personality and practice/coaching style)
+- Prefer mentor/peer/challenger vibes over pure lecture roles
 - Names and personas must be in language: ${language}
 
 Return a JSON object with this exact structure:

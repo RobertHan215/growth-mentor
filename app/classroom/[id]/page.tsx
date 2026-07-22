@@ -175,7 +175,7 @@ export default function ClassroomDetailPage() {
           {loading ? (
             <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
               <div className="text-center text-muted-foreground">
-                <p>Loading classroom...</p>
+                <p>Loading practice...</p>
               </div>
             </div>
           ) : error ? (

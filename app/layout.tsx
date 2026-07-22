@@ -18,8 +18,8 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: '易鑫大学堂',
-  description: 'AI互动课堂平台，将任何主题或文档转化为丰富的互动学习体验。',
+  title: '成长大师兄',
+  description: '成长大师兄 —— AI 对练场。和多智能体一起练表达、练思维、练实战。',
 };
 
 export default function RootLayout({

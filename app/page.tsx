@@ -198,8 +198,8 @@ function HomePage() {
       await deleteStageData(id);
       await loadClassrooms();
     } catch (err) {
-      log.error('Failed to delete classroom:', err);
-      toast.error('Failed to delete classroom');
+      log.error('Failed to delete practice session:', err);
+      toast.error('删除对练失败');
     }
   };
 
@@ -516,7 +516,7 @@ function HomePage() {
         {/* ── Logo ── */}
         <motion.img
           src="/logo-horizontal.png"
-          alt="易鑫大学堂"
+          alt="成长大师兄"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{
@@ -707,7 +707,7 @@ function HomePage() {
 
       {/* Footer — flows with content, at the very end */}
       <div className="mt-auto pt-12 pb-4 text-center text-xs text-muted-foreground/40">
-        易鑫大学堂
+        成长大师兄
       </div>
     </div>
   );

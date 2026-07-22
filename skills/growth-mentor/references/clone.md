@@ -21,7 +21,7 @@ Establish which GrowthMentor checkout will be used for setup and runtime actions
 Clone:
 
 ```bash
-git clone https://github.com/YOUR_ORG/growth-mentor.git
+git clone https://github.com/RobertHan215/growth-mentor.git
 cd growth-mentor
 ```
 

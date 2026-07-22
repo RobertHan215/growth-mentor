@@ -1,6 +1,6 @@
 ---
 name: growth-mentor
-description: Guided SOP for setting up and using GrowthMentor from OpenClaw. Use when the user wants to clone the GrowthMentor repo, choose a startup mode, configure recommended API keys, start the service, or generate a classroom from requirements or a PDF. Run one phase at a time and ask for confirmation before each state-changing step.
+description: Guided SOP for setting up and using GrowthMentor from OpenClaw. Use when the user wants to clone the GrowthMentor repo, choose a startup mode, configure recommended API keys, start the service, or generate a practice session from requirements or a PDF. Run one phase at a time and ask for confirmation before each state-changing step.
 user-invocable: true
 metadata: { "openclaw": { "emoji": "🏫" } }
 ---
@@ -15,13 +15,13 @@ Use this as a guided, confirmation-heavy SOP. Do not compress the whole setup in
 - Before any state-changing action, ask for confirmation.
 - If local state already exists, show what you found and ask whether to keep it.
 - Do not assume the OpenClaw agent's own model or API key will be reused by GrowthMentor.
-- GrowthMentor classroom generation uses GrowthMentor server-side provider config.
+- GrowthMentor practice generation uses GrowthMentor server-side provider config.
 - This skill must not rely on any request-time model or provider overrides.
 - Only GrowthMentor server-side config files may control provider selection and defaults.
 - Do not default to asking the user to paste API keys into chat.
 - Prefer guiding the user to edit local config files themselves.
 - Do not offer to write API keys into config files on the user's behalf.
-- Once setup is complete and the user clearly asks to generate a classroom, do not ask for a second confirmation before submitting the generation job.
+- Once setup is complete and the user clearly asks to generate a practice session, do not ask for a second confirmation before submitting the generation job.
 - Keep confirmations for local file reads such as reading a PDF from disk.
 
 ## Optional Skill Config
@@ -79,7 +79,7 @@ Use this after the repo location is confirmed. Present the available startup mod
 
 Load [references/provider-keys.md](references/provider-keys.md).
 
-Use this before starting classroom generation. Recommend a provider path and tell the user exactly which config file to edit themselves. If generation later fails due to provider/model/auth issues, return to this phase and direct the user to update the same server-side config files.
+Use this before starting practice generation. Recommend a provider path and tell the user exactly which config file to edit themselves. If generation later fails due to provider/model/auth issues, return to this phase and direct the user to update the same server-side config files.
 
 After the core LLM key is configured, ask the user if they want to enable optional features (web search, image generation, video generation, TTS). Each requires its own provider key — see the "Optional Features" section in provider-keys.md.
 
@@ -87,7 +87,7 @@ After the core LLM key is configured, ask the user if they want to enable option
 
 After the user has chosen a startup mode and configured keys, start GrowthMentor using the chosen method, then verify the service with `GET {url}/api/health`.
 
-### 5. Generate A Classroom
+### 5. Generate A Practice Session
 
 Load [references/generate-flow.md](references/generate-flow.md).
 
@@ -99,4 +99,4 @@ Use this only after the service is healthy. Confirm before reading local PDFs. I
 - Prefer 2-3 concrete options when the user must choose.
 - Always include the recommended option first and explain why in one sentence.
 - After a step completes, say what changed and what the next confirmation is for.
-- When returning a classroom link, place the raw absolute URL on its own line with no bold, markdown link syntax, code formatting, or tables.
+- When returning a practice link, place the raw absolute URL on its own line with no bold, markdown link syntax, code formatting, or tables.

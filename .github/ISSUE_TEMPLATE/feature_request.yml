@@ -37,10 +37,10 @@ body:
       label: Area
       description: Which area of the project does this relate to?
       options:
-        - Classroom generation
-        - Multi-agent interaction
+        - Practice generation
+        - Multi-agent roundtable
         - Slides / Whiteboard
-        - Quiz / Assessment
+        - Quiz / drills
         - TTS / Voice
         - Interactive simulations
         - OpenClaw integration

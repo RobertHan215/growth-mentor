@@ -16,7 +16,7 @@ Use this when the user has an access code from your-host and wants to skip local
    - On failure (401): access code is invalid, ask the user to check or regenerate at your-host and update the config file.
    - On failure (network): suggest checking network or trying local mode.
 
-## Generating a Classroom
+## Generating a Practice Session
 
 Follow the same generation flow as [generate-flow.md](generate-flow.md) with these differences:
 

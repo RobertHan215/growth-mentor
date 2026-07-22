@@ -7,7 +7,7 @@ export class ClassroomPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.loadingText = page.getByText('Loading classroom...');
+    this.loadingText = page.getByText('Loading practice...');
     this.sidebarScenes = page.locator('[data-testid="scene-item"]');
   }
 

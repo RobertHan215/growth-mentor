@@ -38,7 +38,7 @@ export const chatZhCN = {
       wb_clear: '清空白板',
       wb_delete: '删除元素',
       wb_close: '关闭白板',
-      discussion: '课堂讨论',
+      discussion: '对练讨论',
     },
     status: {
       inputStreaming: '等待中',
@@ -53,8 +53,8 @@ export const chatZhCN = {
   },
   agentBar: {
     readyToLearn: '准备好一起学习了吗？',
-    expandedTitle: '课堂角色配置',
-    configTooltip: '点击配置课堂角色',
+    expandedTitle: '对练角色配置',
+    configTooltip: '点击配置对练角色',
     voiceLabel: '音色',
     voiceLoading: '加载中...',
     voiceAutoAssign: '音色将自动分配',
@@ -127,8 +127,8 @@ export const chatEnUS = {
   },
   agentBar: {
     readyToLearn: 'Ready to learn together?',
-    expandedTitle: 'Classroom Role Config',
-    configTooltip: 'Click to configure classroom roles',
+    expandedTitle: 'Practice Role Config',
+    configTooltip: 'Click to configure practice roles',
     voiceLabel: 'Voice',
     voiceLoading: 'Loading...',
     voiceAutoAssign: 'Voices will be auto-assigned',
