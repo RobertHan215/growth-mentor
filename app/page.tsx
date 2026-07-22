@@ -43,7 +43,6 @@ import { useSettingsStore } from '@/lib/store/settings';
 import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
 import {
   StageListItem,
-  listStages,
   deleteStageData,
   getFirstSlideByStages,
 } from '@/lib/utils/stage-storage';
@@ -169,7 +168,14 @@ function HomePage() {
   const loadClassrooms = async () => {
     try {
       if (!session?.user?.id) return;
-      const list = await listStages(session.user.id);
+      // Align with training-hub: enrolled courses via UserCourse, not Stage.owner
+      const res = await fetch(asset('/api/db/user-course'));
+      if (!res.ok) {
+        log.error('Failed to load enrolled courses:', res.status);
+        return;
+      }
+      const json = await res.json();
+      const list = (json.data || []) as StageListItem[];
       setClassrooms(list);
       if (list.length > 0) {
         const slides = await getFirstSlideByStages(list.map((c) => c.id));
