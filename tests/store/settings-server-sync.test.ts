@@ -129,6 +129,12 @@ interface MockServerResponse {
   image?: Record<string, Record<string, never>>;
   video?: Record<string, Record<string, never>>;
   webSearch?: Record<string, { baseUrl?: string }>;
+  defaults?: {
+    llm?: { providerId: string; modelId: string };
+    tts?: { providerId: string; voice?: string; speed?: number };
+    asr?: { providerId: string; language?: string };
+    pdf?: { providerId: string };
+  };
 }
 
 function mockServerResponse(overrides: MockServerResponse = {}) {
@@ -270,6 +276,23 @@ describe('fetchServerProviders — provider availability sync', () => {
   });
 
   // ---- Multiple providers ----
+
+  it('applies defaults.llm over first server-configured provider', async () => {
+    const store = await getStore();
+
+    // deepseek-like: first env provider would auto-select without defaults
+    mockServerResponse({
+      providers: {
+        anthropic: { models: ['claude-sonnet-4-6'] },
+        openai: { models: ['gpt-4o'] },
+      },
+      defaults: { llm: { providerId: 'openai', modelId: 'gpt-4o' } },
+    });
+    await store.getState().fetchServerProviders();
+
+    expect(store.getState().providerId).toBe('openai');
+    expect(store.getState().modelId).toBe('gpt-4o');
+  });
 
   it('handles mixed provider state: one configured, one not', async () => {
     const store = await getStore();
