@@ -15,6 +15,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { asset } from '@/lib/branding';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -223,7 +224,7 @@ export function Header({ currentSceneTitle }: HeaderProps) {
                 <button
                   onClick={() => {
                     setUserMenuOpen(false);
-                    signOut({ callbackUrl: `${window.location.origin}/login` });
+                    signOut({ callbackUrl: asset('/login') });
                   }}
                   className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 text-red-500 dark:text-red-400"
                 >

@@ -4,6 +4,7 @@
  */
 
 import type { PDFProviderId, PDFProviderConfig } from './types';
+import { asset } from '@/lib/branding';
 
 /**
  * PDF Provider Registry
@@ -13,7 +14,7 @@ export const PDF_PROVIDERS: Record<PDFProviderId, PDFProviderConfig> = {
     id: 'unpdf',
     name: 'unpdf',
     requiresApiKey: false,
-    icon: '/logos/unpdf.svg',
+    icon: asset('/logos/unpdf.svg'),
     features: ['text', 'images', 'metadata'],
   },
 
@@ -21,7 +22,7 @@ export const PDF_PROVIDERS: Record<PDFProviderId, PDFProviderConfig> = {
     id: 'mineru',
     name: 'MinerU',
     requiresApiKey: false,
-    icon: '/logos/mineru.png',
+    icon: asset('/logos/mineru.png'),
     features: ['text', 'images', 'tables', 'formulas', 'layout-analysis'],
   },
 };

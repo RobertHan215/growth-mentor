@@ -914,7 +914,7 @@ export function Roundtable({
                             <AvatarDisplay
                               src={
                                 (speakingStudent || presentationDiscussionParticipant)?.avatar ||
-                                '/avatars/user.png'
+                                DEFAULT_USER_AVATAR
                               }
                               alt={
                                 (speakingStudent || presentationDiscussionParticipant)?.name || ''

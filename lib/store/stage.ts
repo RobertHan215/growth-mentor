@@ -4,6 +4,7 @@ import { createSelectors } from '@/lib/utils/create-selectors';
 import type { ChatSession } from '@/lib/types/chat';
 import type { SceneOutline } from '@/lib/types/generation';
 import { createLogger } from '@/lib/logger';
+import { asset } from '@/lib/branding';
 
 const log = createLogger('StageStore');
 
@@ -263,7 +264,7 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
       let effectiveUserId = userId || stage.userId;
 
       if (!effectiveUserId) {
-        const res = await fetch('/api/auth/session');
+        const res = await fetch(asset('/api/auth/session'));
         const data = await res.json();
         effectiveUserId = data?.user?.id;
       }

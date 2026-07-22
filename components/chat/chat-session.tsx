@@ -10,6 +10,7 @@ import { AvatarDisplay } from '@/components/ui/avatar-display';
 import { CircleStop } from 'lucide-react';
 import { InlineActionTag } from './inline-action-tag';
 import { useUserProfileStore } from '@/lib/store/user-profile';
+import { asset } from '@/lib/branding';
 
 /** Extended message part type covering standard + custom action parts */
 interface MessagePart {
@@ -29,8 +30,8 @@ interface ChatSessionProps {
 }
 
 const AVATARS = {
-  teacher: '/avatars/teacher.png',
-  user: '/avatars/user.png',
+  teacher: asset('/avatars/teacher.png'),
+  user: asset('/avatars/user.png'),
 };
 
 /**

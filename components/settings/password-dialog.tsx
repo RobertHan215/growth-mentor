@@ -16,6 +16,7 @@ import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { toast } from 'sonner';
 import { signOut } from 'next-auth/react';
+import { asset } from '@/lib/branding';
 
 interface PasswordDialogProps {
   open: boolean;
@@ -67,7 +68,7 @@ export function PasswordDialog({ open, onOpenChange }: PasswordDialogProps) {
       handleOpenChange(false);
 
       setTimeout(() => {
-        signOut({ callbackUrl: `${window.location.origin}/login` });
+        signOut({ callbackUrl: asset('/login') });
       }, 1500);
     } catch (err: any) {
       toast.error(err.message);

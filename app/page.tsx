@@ -26,6 +26,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { asset } from '@/lib/branding';
 import { createLogger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { Textarea as UITextarea } from '@/components/ui/textarea';
@@ -494,7 +495,7 @@ function HomePage() {
               <button
                 onClick={() => {
                   setUserMenuOpen(false);
-                  signOut({ callbackUrl: '/login' });
+                  signOut({ callbackUrl: asset('/login') });
                 }}
                 className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 text-red-500 dark:text-red-400"
               >
@@ -533,7 +534,7 @@ function HomePage() {
       >
         {/* ── Logo ── */}
         <motion.img
-          src="/logo-horizontal.png"
+          src={asset('/logo-horizontal.png')}
           alt="成长大师兄"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

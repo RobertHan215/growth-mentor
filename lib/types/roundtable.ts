@@ -1,4 +1,6 @@
-export const USER_AVATAR = '/avatars/user.png';
+import { asset } from '@/lib/branding';
+
+export const USER_AVATAR = asset('/avatars/user.png');
 
 export type ParticipantRole = 'teacher' | 'student' | 'user';
 

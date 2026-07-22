@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
 import { useStageStore, useCanvasStore } from '@/lib/store';
 import { useI18n } from '@/lib/hooks/use-i18n';
+import { asset } from '@/lib/branding';
 import type { SceneType, SlideContent } from '@/lib/types/stage';
 import { PENDING_SCENE_ID } from '@/lib/store/stage';
 
@@ -127,7 +128,7 @@ export function SceneSidebar({
             title={t('generation.backToHome')}
           >
             <img
-              src="/logo-horizontal.png"
+              src={asset('/logo-horizontal.png')}
               alt="成长大师兄"
               className="h-12 w-auto object-contain"
             />
