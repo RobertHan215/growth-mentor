@@ -27,6 +27,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useStageStore } from '@/lib/store';
 import { useSettingsStore } from '@/lib/store/settings';
+import { getCurrentModelConfig } from '@/lib/utils/model-config';
 import { useRouter } from 'next/navigation';
 import { useAudioRecorder } from '@/lib/hooks/use-audio-recorder';
 import { ReferencePanel, type ReferenceData } from './reference-panel';
@@ -586,12 +587,22 @@ export function OneOnOneStage({ onSwitchMode: _onSwitchMode }: OneOnOneStageProp
       // Load BOTH in parallel
       setSetupProgress('正在提取知识点和参考话术...');
 
+      const mc = getCurrentModelConfig();
+      const modelHeaders: Record<string, string> = {
+        'x-model': mc.modelString || '',
+        'x-api-key': mc.apiKey || '',
+        'x-use-frontend-model-config': String(mc.useFrontendModelConfig ?? false),
+      };
+      if (mc.baseUrl) modelHeaders['x-base-url'] = mc.baseUrl;
+      if (mc.providerType) modelHeaders['x-provider-type'] = mc.providerType;
+      if (mc.requiresApiKey) modelHeaders['x-requires-api-key'] = 'true';
+
       const [roleResult, refResult] = await Promise.allSettled([
         // 1. Load role config
         (async () => {
           const res = await fetch('/api/training/generate-prompt', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...modelHeaders },
             body: JSON.stringify({
               sceneContent: courseContent,
               sceneTitle: stage.name || '',
@@ -606,7 +617,7 @@ export function OneOnOneStage({ onSwitchMode: _onSwitchMode }: OneOnOneStageProp
         (async () => {
           const res = await fetch('/api/training/reference', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...modelHeaders },
             body: JSON.stringify({ courseContent, courseName: stage.name, stageId }),
           });
           if (res.ok) return res.json();
@@ -924,6 +935,7 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
           content: m.content,
         }));
 
+      const mc = getCurrentModelConfig();
       const res = await fetch('/api/training/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -933,6 +945,11 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
           aiRoleName: trainingConfig?.aiRole?.name || 'AI',
           selectedTemplateId: trainingConfig?.selectedTemplateId,
           mode: 'one-on-one',
+          model: mc.modelString,
+          apiKey: mc.apiKey,
+          baseUrl: mc.baseUrl,
+          providerType: mc.providerType,
+          useFrontendModelConfig: mc.useFrontendModelConfig,
         }),
         signal: abortController.signal,
       });
@@ -1113,6 +1130,7 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
 
         void (async () => {
           try {
+            const mc = getCurrentModelConfig();
             const analysisRes = await fetch('/api/training/analyze-turn', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1124,6 +1142,11 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
                 recentMessages: analysisMessages,
                 round,
                 ...(closingPrompt ? { closingPrompt } : {}),
+                model: mc.modelString,
+                apiKey: mc.apiKey,
+                baseUrl: mc.baseUrl,
+                providerType: mc.providerType,
+                useFrontendModelConfig: mc.useFrontendModelConfig,
               }),
             });
 
@@ -1445,9 +1468,18 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
           roleConfig: trainingConfig,
         };
 
+        const mc = getCurrentModelConfig();
         const jobRes = await fetch('/api/training/evaluate-jobs', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-model': mc.modelString || '',
+            'x-api-key': mc.apiKey || '',
+            ...(mc.baseUrl ? { 'x-base-url': mc.baseUrl } : {}),
+            ...(mc.providerType ? { 'x-provider-type': mc.providerType } : {}),
+            ...(mc.requiresApiKey ? { 'x-requires-api-key': 'true' } : {}),
+            'x-use-frontend-model-config': String(mc.useFrontendModelConfig ?? false),
+          },
           body: JSON.stringify(evaluationPayload),
         });
 

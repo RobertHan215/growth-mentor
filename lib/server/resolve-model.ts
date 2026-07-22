@@ -120,8 +120,16 @@ export async function resolveModelWithDefaults(params: {
     }
   }
 
-  const apiKey = clientApiKey || dbDefault?.apiKey || resolveApiKey(providerId);
-  const baseUrl = clientBaseUrl || dbDefault?.baseUrl || resolveBaseUrl(providerId);
+  // Guard misconfigured defaults: URL accidentally saved into apiKey field
+  let dbApiKey = dbDefault?.apiKey || '';
+  let dbBaseUrl = dbDefault?.baseUrl || undefined;
+  if (dbApiKey && /^https?:\/\//i.test(dbApiKey)) {
+    if (!dbBaseUrl) dbBaseUrl = dbApiKey;
+    dbApiKey = '';
+  }
+
+  const apiKey = clientApiKey || dbApiKey || resolveApiKey(providerId);
+  const baseUrl = clientBaseUrl || dbBaseUrl || resolveBaseUrl(providerId);
   const proxy = resolveProxy(providerId);
   const { model, modelInfo } = getModel({
     providerId,
