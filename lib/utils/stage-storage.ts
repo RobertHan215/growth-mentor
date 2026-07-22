@@ -42,6 +42,9 @@ export interface StageListItem {
   sceneCount: number;
   createdAt: number;
   updatedAt: number;
+  supportedModes?: string[];
+  learningMode?: 'teaching' | 'oneOnOne';
+  coverImage?: string;
 }
 
 /**
@@ -65,6 +68,7 @@ export async function saveStageData(
         style: data.stage.style,
         currentSceneId: data.currentSceneId || undefined,
         agentIds: data.stage.agentIds,
+        learningMode: data.stage.learningMode,
       });
     } else {
       await hybridCreateStage({
@@ -78,6 +82,7 @@ export async function saveStageData(
         style: data.stage.style,
         currentSceneId: data.currentSceneId || undefined,
         agentIds: data.stage.agentIds,
+        learningMode: data.stage.learningMode,
       });
     }
 
@@ -170,6 +175,9 @@ export async function listStages(userId: string): Promise<StageListItem[]> {
           sceneCount: scenes.length,
           createdAt: stage.createdAt,
           updatedAt: stage.updatedAt,
+          supportedModes: (stage.directorConfig as { supportedModes?: string[] } | undefined)?.supportedModes,
+          learningMode: stage.learningMode,
+          coverImage: stage.coverImage,
         };
       }),
     );

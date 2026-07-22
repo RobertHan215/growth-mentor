@@ -131,9 +131,14 @@ export async function POST(req: NextRequest) {
     const roleConfigSignature = getRoleGenerationConfigSignature(globalConfig);
     const enabledDimensions = getEnabledPromptDimensions(globalConfig);
 
-    // ── Check cache (skip if force regenerate) ──
-    // Also skip cache if stage has character templates (use those instead)
+    // ── Resolve character templates (multi-role carousel) ──
+    // Priority: explicit IDs → stage/oneOnOne tags → collection-scene fallback → cache
+    const COLLECTION_KEYWORDS = ['催收', '逾期', '还款', '账款', '借款', '债务', '催款', '欠款', '电催'];
+    const sceneTextForMatch = `${sceneTitle} ${sceneContent}`;
+    const isCollectionSceneEarly = COLLECTION_KEYWORDS.some((kw) => sceneTextForMatch.includes(kw));
+
     let characterTemplates: CharacterTemplateForRole[] = [];
+    let cachedRoles: Record<string, unknown> | null = null;
     if (stageId) {
       try {
         const stage = await prisma.stage.findUnique({
@@ -146,7 +151,12 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // If stage has characterTemplateIds, load those templates directly
+        const rawCached = (stage?.directorConfig as Record<string, unknown> | null)?.oneOnOneRoles;
+        if (rawCached && typeof rawCached === 'object') {
+          cachedRoles = rawCached as Record<string, unknown>;
+        }
+
+        // 1) Explicit template IDs on the stage
         if (stage?.characterTemplateIds) {
           try {
             const templateIds = JSON.parse(stage.characterTemplateIds) as string[];
@@ -160,8 +170,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // If no specific template IDs, use the one-on-one tag or regular course tags
-        // to find templates. The admin UI currently configures normal course tags.
+        // 2) Match by oneOnOneTagId / course tags
         const stageTemplateTagIds = getStageTemplateTagIds(stage);
         if (characterTemplates.length === 0 && stageTemplateTagIds.length > 0) {
           const allTemplates = await prisma.aiCharacterTemplate.findMany();
@@ -170,15 +179,23 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        // If we have character templates, skip cache and use them
-        if (characterTemplates.length === 0 && !force) {
-          const cached = (stage?.directorConfig as Record<string, unknown>)?.oneOnOneRoles;
+        // 3) Collection scene without tags: still surface all character templates
+        //    (same multi-role carousel as tagged 催收 courses)
+        if (characterTemplates.length === 0 && isCollectionSceneEarly) {
+          characterTemplates = await prisma.aiCharacterTemplate.findMany();
+        }
+
+        // 4) Cache hit only when we have no templates AND cache already has multi options
+        //    (never prefer a single-role LLM cache over real templates)
+        if (characterTemplates.length === 0 && !force && cachedRoles) {
+          const cachedOptions = cachedRoles.templateOptions;
+          const hasMulti =
+            Array.isArray(cachedOptions) && cachedOptions.length > 1;
           if (
-            cached &&
-            typeof cached === 'object' &&
-            (cached as Record<string, unknown>).globalConfigSignature === roleConfigSignature
+            hasMulti &&
+            cachedRoles.globalConfigSignature === roleConfigSignature
           ) {
-            const normalizedCached = normalizeOpeningPolicy(cached as Record<string, unknown>);
+            const normalizedCached = normalizeOpeningPolicy(cachedRoles);
             return NextResponse.json({
               success: true,
               ...normalizedCached,
@@ -189,11 +206,16 @@ export async function POST(req: NextRequest) {
       } catch {
         // Cache miss, continue to generate
       }
+    } else if (isCollectionSceneEarly) {
+      // No stageId (rare) — still load templates for collection scenes
+      try {
+        characterTemplates = await prisma.aiCharacterTemplate.findMany();
+      } catch {
+        /* ignore */
+      }
     }
 
-    const { model } = await resolveModelFromHeaders(req);
-
-    // ── If we have character templates, use them directly instead of generating ──
+    // ── If we have character templates, use them directly (no LLM / API key needed) ──
     if (characterTemplates.length > 0) {
       // Randomly select one template from the available ones
       const selectedIndex = Math.floor(Math.random() * characterTemplates.length);
@@ -258,10 +280,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── Detect collection scenario ──
-    const COLLECTION_KEYWORDS = ['催收', '逾期', '还款', '账款', '借款', '债务', '催款', '欠款'];
-    const sceneText = `${sceneTitle} ${sceneContent}`;
-    const isCollectionScene = COLLECTION_KEYWORDS.some((kw) => sceneText.includes(kw));
+    // ── LLM fallback (only when no character templates) ──
+    // Also prefer multi-role cache here if signature drifted but options exist
+    if (!force && cachedRoles) {
+      const cachedOptions = cachedRoles.templateOptions;
+      if (Array.isArray(cachedOptions) && cachedOptions.length > 1) {
+        return NextResponse.json({
+          success: true,
+          ...normalizeOpeningPolicy(cachedRoles),
+          globalConfig,
+        });
+      }
+    }
+
+    const { model } = await resolveModelFromHeaders(req);
+
+    // ── Detect collection scenario (reuse early match) ──
+    const isCollectionScene = isCollectionSceneEarly;
     const dimensionJsonSpec = enabledDimensions
       .map(
         (dimension) =>

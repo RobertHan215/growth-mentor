@@ -48,6 +48,7 @@ import {
 } from '@/lib/utils/stage-storage';
 import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
 import type { Slide } from '@/lib/types/slides';
+import { deriveLearningMode } from '@/lib/training/course-learning-mode';
 import { useMediaGenerationStore } from '@/lib/store/media-generation';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -1069,7 +1070,16 @@ function ClassroomCard({
         ref={thumbRef}
         className="relative w-full aspect-[16/9] rounded-2xl bg-slate-100 dark:bg-slate-800/80 overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]"
       >
-        {slide && thumbWidth > 0 ? (
+        {classroom.coverImage ? (
+          <img
+            src={classroom.coverImage}
+            alt={classroom.name}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : slide && thumbWidth > 0 ? (
           <ThumbnailSlide
             slide={slide}
             size={thumbWidth}
@@ -1142,7 +1152,16 @@ function ClassroomCard({
       </div>
 
       {/* Info — outside the thumbnail */}
-      <div className="mt-2.5 px-1 flex items-center gap-2">
+      <div className="mt-2.5 px-1 flex items-center gap-2 flex-wrap">
+        {deriveLearningMode(classroom) === 'oneOnOne' ? (
+          <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+            ⚔️ 一对一模式
+          </span>
+        ) : (
+          <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+            📖 教学模式
+          </span>
+        )}
         <span className="shrink-0 inline-flex items-center rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-[11px] font-medium text-violet-600 dark:text-violet-400">
           {classroom.sceneCount} {t('classroom.slides')} · {formatDate(classroom.updatedAt)}
         </span>
