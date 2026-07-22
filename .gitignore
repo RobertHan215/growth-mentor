@@ -71,3 +71,7 @@ next-env.d.ts
 
 # docs
 /docs
+tmp/
+
+# Local DB dumps may contain secrets — keep on disk, do not push
+backups/mysql/*.sql

@@ -1,10 +1,40 @@
 services:
+  # Local MySQL for offline dev / demo (host port 3307)
+  mysql:
+    image: mysql:8.0
+    container_name: growth-mentor-mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: gm_root_local
+      MYSQL_DATABASE: growth_mentor_local
+      MYSQL_USER: gm
+      MYSQL_PASSWORD: gm_local
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - growth-mentor-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pgm_root_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   growth-mentor:
     build: .
     ports:
       - "3000:3000"
     env_file:
       - .env.local
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      # App container reaches MySQL via service name (not host 3307)
+      DATABASE_URL: mysql://gm:gm_local@mysql:3306/growth_mentor_local
     volumes:
       # Optional: mount server-providers.yml for provider config
       # - ./server-providers.yml:/app/server-providers.yml:ro
@@ -13,3 +43,4 @@ services:
 
 volumes:
   growth-mentor-data:
+  growth-mentor-mysql:
