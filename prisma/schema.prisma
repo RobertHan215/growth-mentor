@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户认证相关 ====================
+
+model User {
+  id           String    @id @default(uuid())
+  username     String?   @unique
+  passwordHash String?   @map("password_hash")
+  email        String?   @unique
+  name         String
+  avatar       String?
+  role         String    @default("user")
+  providerType String    @default("credentials") @map("provider_type")
+  providerId   String?   @map("provider_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  accounts Account[]
+  sessions Session[]
+  stages   Stage[]
+
+  @@map("users")
+}
+
+model Account {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  providerType String    @map("provider_type")
+  providerId   String    @map("provider_id")
+  accessToken  String?   @map("access_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "accounts_user_id_fkey")
+  @@map("accounts")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "sessions_user_id_fkey")
+  @@map("sessions")
+}
+
+// ==================== 课程数据 ====================
+
+model Stage {
+  id             String   @id
+  userId         String   @map("user_id")
+  name           String
+  description    String?  @db.Text
+  language       String?
+  style          String?
+  currentSceneId String?  @map("current_scene_id")
+  agentIds       String?  @map("agent_ids") @db.Text // JSON array
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes            Scene[]
+  chatSessions      ChatSession[]
+  playbackState     PlaybackState?
+  stageOutlines     StageOutlines?
+  mediaFiles        MediaFile[]
+  generatedAgents   GeneratedAgent[]
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("stages")
+}
+
+model Scene {
+  id         String   @id
+  stageId    String   @map("stage_id")
+  type       String   // 'slide' | 'quiz' | 'interactive' | 'pbl'
+  title      String
+  order      Int
+  content    Json     @db.Json
+  actions    Json?    @db.Json
+  whiteboard Json?    @db.Json
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@index([stageId, order])
+  @@map("scenes")
+}
+
+// ==================== 聊天相关 ====================
+
+model ChatSession {
+  id                String   @id
+  stageId           String   @map("stage_id")
+  sceneId           String?  @map("scene_id")
+  type              String   // 'qa' | 'discussion' | 'lecture'
+  title             String
+  status            String   // 'active' | 'archived'
+  messages          Json     @db.Json
+  config            Json     @db.Json
+  toolCalls         Json     @db.Json
+  pendingToolCalls  Json     @db.Json
+  lastActionIndex   Int?     @map("last_action_index")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@index([stageId, createdAt])
+  @@map("chat_sessions")
+}
+
+model PlaybackState {
+  stageId             String   @id @map("stage_id")
+  sceneIndex          Int      @map("scene_index")
+  actionIndex         Int      @map("action_index")
+  consumedDiscussions Json     @db.Json
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@map("playback_states")
+}
+
+model StageOutlines {
+  stageId   String   @id @map("stage_id")
+  outlines  Json     @db.Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@map("stage_outlines")
+}
+
+model GeneratedAgent {
+  id        String   @id
+  stageId   String   @map("stage_id")
+  name      String
+  role      String   // 'teacher' | 'assistant' | 'student'
+  persona   String   @db.Text
+  avatar    String
+  color     String
+  priority  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@map("generated_agents")
+}
+
+// ==================== 文件存储（Blob 数据） ====================
+
+model AudioFile {
+  id        String   @id
+  blob      Bytes    @db.LongBlob
+  duration  Float?
+  format    String
+  text      String?  @db.Text
+  voice     String?
+  ossKey    String?  @map("oss_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audio_files")
+}
+
+model ImageFile {
+  id        String   @id
+  blob      Bytes    @db.LongBlob
+  filename  String
+  mimeType  String   @map("mime_type")
+  size      Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("image_files")
+}
+
+model MediaFile {
+  id           String   @id // compound: stageId:elementId
+  stageId      String   @map("stage_id")
+  type         String   // 'image' | 'video'
+  blob         Bytes    @db.LongBlob
+  mimeType     String   @map("mime_type")
+  size         Int
+  poster       Bytes?   @db.LongBlob
+  prompt       String   @db.Text
+  params       String   @db.Text // JSON
+  error        String?  @db.Text
+  errorCode    String?  @map("error_code")
+  ossKey       String?  @map("oss_key")
+  posterOssKey String?  @map("poster_oss_key")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@index([stageId, type])
+  @@map("media_files")
+}
+
+// ==================== 撤销/重做快照 ====================
+
+model Snapshot {
+  id        Int     @id @default(autoincrement())
+  index     Int
+  slides    Json    @db.Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("snapshots")
+}
