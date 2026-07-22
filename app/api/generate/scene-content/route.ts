@@ -12,12 +12,17 @@ import {
   applyOutlineFallbacks,
   generateSceneContent,
   buildVisionUserContent,
+  resizeImagesForVision,
 } from '@/lib/generation/generation-pipeline';
 import type { AgentInfo } from '@/lib/generation/generation-pipeline';
 import type { SceneOutline, PdfImage, ImageMapping } from '@/lib/types/generation';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
-import { resolveModelFromHeaders } from '@/lib/server/resolve-model';
+import {
+  resolveTextModel,
+  suppressThinking,
+  suppressThinkingInUserPrompt,
+} from '@/lib/server/resolve-model';
 
 const log = createLogger('Scene Content API');
 
@@ -53,6 +58,14 @@ export async function POST(req: NextRequest) {
     if (!rawOutline) {
       return apiError('MISSING_REQUIRED_FIELD', 400, 'outline is required');
     }
+    if (!rawOutline.title) {
+      log.error('Outline missing title:', rawOutline);
+      return apiError('MISSING_REQUIRED_FIELD', 400, 'outline.title is required');
+    }
+    if (!rawOutline.type) {
+      log.error('Outline missing type:', rawOutline);
+      return apiError('MISSING_REQUIRED_FIELD', 400, 'outline.type is required');
+    }
     if (!allOutlines || allOutlines.length === 0) {
       return apiError(
         'MISSING_REQUIRED_FIELD',
@@ -71,7 +84,12 @@ export async function POST(req: NextRequest) {
     };
 
     // ── Model resolution from request headers ──
-    const { model: languageModel, modelInfo, modelString } = resolveModelFromHeaders(req);
+    // Use resolveTextModel: if user selected a VL-Thinking model, fall back to
+    // the plain text model for content generation (no images are sent here).
+    const { model: languageModel, modelInfo, modelString } = await resolveTextModel(req);
+    log.info(
+      `Generating content: "${outline.title}" (${outline.type}) [model=openai:${modelString}]`,
+    );
 
     // Detect vision capability
     const hasVision = !!modelInfo?.capabilities?.vision;
@@ -82,18 +100,36 @@ export async function POST(req: NextRequest) {
       userPrompt: string,
       images?: Array<{ id: string; src: string }>,
     ): Promise<string> => {
-      if (images?.length && hasVision) {
+      // Suppress thinking for Qwen3-VL-Thinking models via /no_think directive
+      const effectiveSystem = suppressThinking(systemPrompt, modelString);
+      const effectiveUser = suppressThinkingInUserPrompt(userPrompt, modelString);
+
+      // Dynamically calculate a safe output token budget.
+      // Estimate input tokens at 3 chars/token (conservative for Chinese text).
+      // Leave at least 256 tokens of safety margin to avoid off-by-one errors.
+      const contextWindow = modelInfo?.contextWindow ?? 16384;
+      const configuredOutput = modelInfo?.outputWindow ?? 1536;
+      const estimatedInputTokens = Math.ceil((effectiveSystem.length + effectiveUser.length) / 3);
+      const remainingTokens = contextWindow - estimatedInputTokens - 256;
+      const safeOutputTokens = Math.min(configuredOutput, Math.max(512, remainingTokens));
+
+      // Only send images when the model has a large enough context window.
+      // For models with contextWindow <= 32768 the slide generation prompt alone
+      // already consumes ~10k tokens — adding image tokens would overflow.
+      const contextIsLarge = contextWindow > 32768;
+      if (images?.length && hasVision && contextIsLarge) {
+        const resizedImages = await resizeImagesForVision(images);
         const result = await callLLM(
           {
             model: languageModel,
-            system: systemPrompt,
+            system: effectiveSystem,
             messages: [
               {
                 role: 'user' as const,
-                content: buildVisionUserContent(userPrompt, images),
+                content: buildVisionUserContent(effectiveUser, resizedImages),
               },
             ],
-            maxOutputTokens: modelInfo?.outputWindow,
+            maxOutputTokens: safeOutputTokens,
           },
           'scene-content',
         );
@@ -102,9 +138,9 @@ export async function POST(req: NextRequest) {
       const result = await callLLM(
         {
           model: languageModel,
-          system: systemPrompt,
-          prompt: userPrompt,
-          maxOutputTokens: modelInfo?.outputWindow,
+          system: effectiveSystem,
+          prompt: effectiveUser,
+          maxOutputTokens: safeOutputTokens,
         },
         'scene-content',
       );
@@ -148,13 +184,11 @@ export async function POST(req: NextRequest) {
     );
 
     if (!content) {
-      log.error(`Failed to generate content for: "${effectiveOutline.title}"`);
+      const errorMsg = `Failed to generate ${effectiveOutline.type} content for: "${effectiveOutline.title}"`;
+      log.error(errorMsg);
+      log.error('Outline details:', JSON.stringify(effectiveOutline, null, 2));
 
-      return apiError(
-        'GENERATION_FAILED',
-        500,
-        `Failed to generate content: ${effectiveOutline.title}`,
-      );
+      return apiError('GENERATION_FAILED', 500, errorMsg);
     }
 
     log.info(`Content generated successfully: "${effectiveOutline.title}"`);
@@ -162,6 +196,19 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ content, effectiveOutline });
   } catch (error) {
     log.error('Scene content generation error:', error);
-    return apiError('INTERNAL_ERROR', 500, error instanceof Error ? error.message : String(error));
+
+    // Better error message
+    const errorMessage =
+      error instanceof Error
+        ? `${error.message}${error.stack ? `\n${error.stack}` : ''}`
+        : String(error);
+
+    log.error('Full error details:', errorMessage);
+
+    return apiError(
+      'GENERATION_FAILED',
+      500,
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }

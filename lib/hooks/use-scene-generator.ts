@@ -43,6 +43,7 @@ function getApiHeaders(): HeadersInit {
     'x-base-url': config.baseUrl || '',
     'x-provider-type': config.providerType || '',
     'x-requires-api-key': String(config.requiresApiKey ?? false),
+    'x-use-frontend-model-config': String(config.useFrontendModelConfig ?? false),
     // Image generation provider
     'x-image-provider': settings.imageProviderId || '',
     'x-image-model': settings.imageModelId || '',
@@ -141,6 +142,7 @@ export async function generateAndStoreTTS(
       ttsSpeed: settings.ttsSpeed,
       ttsApiKey: ttsProviderConfig?.apiKey || undefined,
       ttsBaseUrl: ttsProviderConfig?.baseUrl || undefined,
+      useFrontendTTSConfig: settings.useFrontendTTSConfig,
     }),
     signal,
   });

@@ -7,6 +7,9 @@ import {
   deleteStageWithRelatedData,
   getFirstSlideByStages,
 } from '@/lib/db';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/config';
+import { checkCourseVisibility } from '@/lib/server/course-visibility';
 
 function apiLog(
   name: string,
@@ -39,6 +42,37 @@ export async function GET(request: NextRequest) {
 
     if (stageId) {
       const stage = await getStage(stageId);
+
+      // Visibility check: query raw Prisma record for visibility fields
+      // (StageRecord doesn't include isPublished/visibilityRoles/visibilityUsers)
+      if (stage) {
+        const { prisma: db } = await import('@/lib/db');
+        const rawStage = await db.stage.findUnique({
+          where: { id: stageId },
+          select: { isPublished: true, visibilityRoles: true, visibilityUsers: true },
+        });
+
+        if (rawStage) {
+          const session = await getServerSession(authOptions);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sessionUser = session?.user as any;
+          const user = sessionUser
+            ? { id: sessionUser.id as string, role: (sessionUser.role as string) || 'user' }
+            : null;
+
+          // Admin always passes; non-admin check visibility
+          if (!user || user.role !== 'admin') {
+            const canAccess = user
+              ? checkCourseVisibility(rawStage, user)
+              : rawStage.isPublished && !rawStage.visibilityRoles && !rawStage.visibilityUsers;
+            if (!canAccess) {
+              apiLog('stage', 'GET', url, params, 403, Date.now() - start);
+              return NextResponse.json({ error: 'No permission to access this course' }, { status: 403 });
+            }
+          }
+        }
+      }
+
       apiLog('stage', 'GET', url, params, 200, Date.now() - start);
       return NextResponse.json({ success: true, data: stage });
     }

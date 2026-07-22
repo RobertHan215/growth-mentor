@@ -22,6 +22,9 @@ export interface StageRecord {
   style?: string;
   currentSceneId?: string;
   agentIds?: string[];
+  learningMode?: 'teaching' | 'oneOnOne';
+  directorConfig?: Record<string, unknown>;
+  coverImage?: string;
 }
 
 // ==================== Scene Types ====================
@@ -86,6 +89,7 @@ export interface MediaFileRecord {
 
 export interface ChatSessionRecord {
   id: string;
+  userId?: string;
   stageId: string;
   sceneId?: string;
   type: SessionType;

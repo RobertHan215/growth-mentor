@@ -12,6 +12,7 @@ import {
   generateSceneActions,
   buildCompleteScene,
   buildVisionUserContent,
+  resizeImagesForVision,
   type SceneGenerationContext,
   type AgentInfo,
 } from '@/lib/generation/generation-pipeline';
@@ -25,7 +26,11 @@ import type {
 import type { SpeechAction } from '@/lib/types/action';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
-import { resolveModelFromHeaders } from '@/lib/server/resolve-model';
+import {
+  resolveTextModel,
+  suppressThinking,
+  suppressThinkingInUserPrompt,
+} from '@/lib/server/resolve-model';
 
 const log = createLogger('Scene Actions API');
 
@@ -75,7 +80,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Model resolution from request headers ──
-    const { model: languageModel, modelInfo, modelString } = resolveModelFromHeaders(req);
+    // Use resolveTextModel to fall back from VL-Thinking to plain text model.
+    const { model: languageModel, modelInfo, modelString } = await resolveTextModel(req);
 
     // Detect vision capability
     const hasVision = !!modelInfo?.capabilities?.vision;
@@ -86,15 +92,18 @@ export async function POST(req: NextRequest) {
       userPrompt: string,
       images?: Array<{ id: string; src: string }>,
     ): Promise<string> => {
+      const effectiveSystem = suppressThinking(systemPrompt, modelString);
+      const effectiveUser = suppressThinkingInUserPrompt(userPrompt, modelString);
       if (images?.length && hasVision) {
+        const resizedImages = await resizeImagesForVision(images);
         const result = await callLLM(
           {
             model: languageModel,
-            system: systemPrompt,
+            system: effectiveSystem,
             messages: [
               {
                 role: 'user' as const,
-                content: buildVisionUserContent(userPrompt, images),
+                content: buildVisionUserContent(effectiveUser, resizedImages),
               },
             ],
             maxOutputTokens: modelInfo?.outputWindow,
@@ -106,8 +115,8 @@ export async function POST(req: NextRequest) {
       const result = await callLLM(
         {
           model: languageModel,
-          system: systemPrompt,
-          prompt: userPrompt,
+          system: effectiveSystem,
+          prompt: effectiveUser,
           maxOutputTokens: modelInfo?.outputWindow,
         },
         'scene-actions',

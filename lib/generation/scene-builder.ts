@@ -118,6 +118,7 @@ export async function buildSceneFromOutline(
 
 /**
  * Build complete Scene object (without API/store)
+ * @param existingId - if provided, use this id to overwrite the existing scene in DB
  */
 export function buildCompleteScene(
   outline: SceneOutline,
@@ -128,8 +129,9 @@ export function buildCompleteScene(
     | GeneratedPBLContent,
   actions: Action[],
   stageId: string,
+  existingId?: string,
 ): Scene | null {
-  const sceneId = nanoid();
+  const sceneId = existingId ?? nanoid();
 
   if (outline.type === 'slide' && 'elements' in content) {
     // Build Slide object

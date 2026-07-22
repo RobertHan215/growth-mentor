@@ -46,6 +46,13 @@ export interface StageRecord {
   style?: string;
   currentSceneId?: string;
   agentIds?: string[];
+  learningMode?: 'teaching' | 'oneOnOne';
+  directorConfig?: Record<string, unknown>;
+  visibilityRoles?: string;
+  visibilityUsers?: string;
+  coverImage?: string;
+  oneOnOneTagId?: string;
+  characterTemplateIds?: string[];
 }
 
 export interface SceneRecord {
@@ -83,6 +90,7 @@ export interface ImageFileRecord {
 
 export interface ChatSessionRecord {
   id: string;
+  userId?: string;
   stageId: string;
   type: SessionType;
   title: string;
@@ -141,6 +149,15 @@ export interface GeneratedAgentRecord {
   createdAt: number;
 }
 
+export interface CourseSummaryRecord {
+  id: string;
+  userId: string;
+  stageId: string;
+  content: any; // CourseSummaryContent
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Snapshot {
   id?: number;
   index: number;
@@ -160,7 +177,14 @@ function stageFromDB(record: {
   style: string | null;
   currentSceneId: string | null;
   agentIds: string | null;
-}): StageRecord {
+  directorConfig?: unknown;
+  learningMode?: string | null;
+  visibilityRoles?: string | null;
+  visibilityUsers?: string | null;
+  coverImage?: string | null;
+  oneOnOneTagId?: string | null;
+  characterTemplateIds?: string | null;
+}): StageRecord & { directorConfig?: Record<string, unknown> } {
   return {
     id: record.id,
     userId: record.userId,
@@ -172,6 +196,13 @@ function stageFromDB(record: {
     style: record.style || undefined,
     currentSceneId: record.currentSceneId || undefined,
     agentIds: record.agentIds ? JSON.parse(record.agentIds) : undefined,
+    learningMode: record.learningMode === 'oneOnOne' ? 'oneOnOne' : 'teaching',
+    ...(record.directorConfig ? { directorConfig: record.directorConfig as Record<string, unknown> } : {}),
+    visibilityRoles: record.visibilityRoles || undefined,
+    visibilityUsers: record.visibilityUsers || undefined,
+    coverImage: record.coverImage || undefined,
+    oneOnOneTagId: record.oneOnOneTagId || undefined,
+    characterTemplateIds: record.characterTemplateIds ? JSON.parse(record.characterTemplateIds) : undefined,
   };
 }
 
@@ -185,6 +216,9 @@ function stageToDB(record: Partial<StageRecord> & { id: string; userId: string; 
     style: record.style || null,
     currentSceneId: record.currentSceneId || null,
     agentIds: record.agentIds ? JSON.stringify(record.agentIds) : null,
+    learningMode: record.learningMode || 'teaching',
+    oneOnOneTagId: record.oneOnOneTagId || null,
+    characterTemplateIds: record.characterTemplateIds ? JSON.stringify(record.characterTemplateIds) : null,
   };
 }
 
@@ -252,18 +286,38 @@ export async function createStage(record: StageRecord): Promise<void> {
 
 export async function updateStage(
   stageId: string,
-  data: Partial<Omit<StageRecord, 'id' | 'userId' | 'createdAt'>>,
+  data: Partial<Omit<StageRecord, 'id' | 'userId' | 'createdAt'>> & { directorConfig?: Record<string, unknown> },
 ): Promise<void> {
+  const updateData: Record<string, unknown> = {
+    name: data.name,
+    description: data.description || null,
+    language: data.language || null,
+    style: data.style || null,
+    currentSceneId: data.currentSceneId || null,
+    agentIds: data.agentIds ? JSON.stringify(data.agentIds) : null,
+    learningMode: data.learningMode,
+    oneOnOneTagId: data.oneOnOneTagId || null,
+    characterTemplateIds: data.characterTemplateIds ? JSON.stringify(data.characterTemplateIds) : null,
+  };
+
+  // Deep-merge directorConfig: read existing value, then spread new fields on top
+  if (data.directorConfig) {
+    const existing = await prisma.stage.findUnique({
+      where: { id: stageId },
+      select: { directorConfig: true },
+    });
+    const existingConfig = (existing?.directorConfig as Record<string, unknown>) || {};
+    updateData.directorConfig = { ...existingConfig, ...data.directorConfig };
+  }
+
+  // Remove undefined keys so Prisma doesn't accidentally null out untouched fields
+  for (const key of Object.keys(updateData)) {
+    if (updateData[key] === undefined) delete updateData[key];
+  }
+
   await prisma.stage.update({
     where: { id: stageId },
-    data: {
-      name: data.name,
-      description: data.description || null,
-      language: data.language || null,
-      style: data.style || null,
-      currentSceneId: data.currentSceneId || null,
-      agentIds: data.agentIds ? JSON.stringify(data.agentIds) : null,
-    },
+    data: updateData as Parameters<typeof prisma.stage.update>[0]['data'],
   });
 }
 
@@ -330,13 +384,14 @@ export async function deleteScenesByStageId(stageId: string): Promise<void> {
 
 // ==================== Chat Session Operations ====================
 
-export async function getChatSessionsByStageId(stageId: string): Promise<ChatSessionRecord[]> {
+export async function getChatSessionsByStageId(stageId: string, userId?: string): Promise<ChatSessionRecord[]> {
   const sessions = await prisma.chatSession.findMany({
-    where: { stageId },
+    where: { ...(userId ? { userId } : {}), stageId },
     orderBy: { createdAt: 'desc' },
   });
   return sessions.map((s) => ({
     id: s.id,
+    userId: s.userId ?? undefined,
     stageId: s.stageId,
     sceneId: s.sceneId || undefined,
     type: s.type as SessionType,
@@ -359,6 +414,7 @@ export async function getChatSession(sessionId: string): Promise<ChatSessionReco
   if (!session) return null;
   return {
     id: session.id,
+    userId: session.userId ?? undefined,
     stageId: session.stageId,
     sceneId: session.sceneId || undefined,
     type: session.type as SessionType,
@@ -378,6 +434,7 @@ export async function createChatSession(record: ChatSessionRecord): Promise<void
   await prisma.chatSession.create({
     data: {
       id: record.id,
+      userId: record.userId,
       stageId: record.stageId,
       sceneId: record.sceneId || null,
       type: record.type,
@@ -394,7 +451,8 @@ export async function createChatSession(record: ChatSessionRecord): Promise<void
 
 export async function updateChatSession(
   sessionId: string,
-  data: Partial<Omit<ChatSessionRecord, 'id' | 'stageId' | 'createdAt'>>,
+  userId: string,
+  data: Partial<Omit<ChatSessionRecord, 'id' | 'userId' | 'stageId' | 'createdAt'>>,
 ): Promise<void> {
   const updateData: Record<string, unknown> = {};
   if (data.title !== undefined) updateData.title = data.title;
@@ -407,7 +465,7 @@ export async function updateChatSession(
 
   try {
     await prisma.chatSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, userId },
       data: updateData,
     });
   } catch (error: unknown) {
@@ -425,9 +483,9 @@ export async function updateChatSession(
   }
 }
 
-export async function deleteChatSession(sessionId: string): Promise<void> {
+export async function deleteChatSession(sessionId: string, userId: string): Promise<void> {
   await prisma.chatSession.delete({
-    where: { id: sessionId },
+    where: { id: sessionId, userId },
   });
 }
 
@@ -564,10 +622,23 @@ export async function getImageFile(id: string): Promise<ImageFileRecord | null> 
 }
 
 export async function saveImageFile(record: ImageFileRecord): Promise<void> {
+  let blobData: Buffer;
+  const blob = record.blob as unknown;
+
+  if (Buffer.isBuffer(blob)) {
+    blobData = blob;
+  } else if (blob instanceof Uint8Array) {
+    blobData = Buffer.from(blob);
+  } else if (blob instanceof ArrayBuffer) {
+    blobData = Buffer.from(blob);
+  } else {
+    blobData = Buffer.from(JSON.stringify(blob));
+  }
+
   await prisma.imageFile.create({
     data: {
       id: record.id,
-      blob: record.blob as any,
+      blob: new Uint8Array(blobData),
       filename: record.filename,
       mimeType: record.mimeType,
       size: record.size,
@@ -576,7 +647,7 @@ export async function saveImageFile(record: ImageFileRecord): Promise<void> {
 }
 
 export async function deleteImageFile(id: string): Promise<void> {
-  await prisma.imageFile.delete({
+  await prisma.imageFile.deleteMany({
     where: { id },
   });
 }
@@ -732,6 +803,37 @@ export async function deleteGeneratedAgentsByStageId(stageId: string): Promise<v
   });
 }
 
+// ==================== Course Summary Operations ====================
+
+export async function getCourseSummary(userId: string, stageId: string): Promise<CourseSummaryRecord | null> {
+  const summary = await prisma.courseSummary.findUnique({
+    where: { userId_stageId: { userId, stageId } },
+  });
+  if (!summary) return null;
+  return {
+    id: summary.id,
+    userId: summary.userId,
+    stageId: summary.stageId,
+    content: summary.content,
+    createdAt: summary.createdAt.getTime(),
+    updatedAt: summary.updatedAt.getTime(),
+  };
+}
+
+export async function saveCourseSummary(record: Omit<CourseSummaryRecord, "id" | "createdAt" | "updatedAt">): Promise<void> {
+  await prisma.courseSummary.upsert({
+    where: { userId_stageId: { userId: record.userId, stageId: record.stageId } },
+    update: {
+      content: record.content as any,
+    },
+    create: {
+      userId: record.userId,
+      stageId: record.stageId,
+      content: record.content as any,
+    },
+  });
+}
+
 // ==================== Snapshot Operations ====================
 
 export async function getSnapshots(): Promise<Snapshot[]> {
@@ -765,6 +867,80 @@ export async function clearSnapshots(): Promise<void> {
   await prisma.snapshot.deleteMany();
 }
 
+// ==================== UserCourse (Enrollment) Operations ====================
+
+export interface UserCourseRecord {
+  userId: string;
+  stageId: string;
+  source: string;
+  status: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface EnrolledStageItem extends StageRecord {
+  sceneCount: number;
+  supportedModes?: string[];
+  learningMode?: 'teaching' | 'oneOnOne';
+}
+
+export async function getEnrolledStages(userId: string): Promise<EnrolledStageItem[]> {
+  const userCourses = await prisma.userCourse.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      stage: {
+        include: {
+          stageTags: { include: { tag: true } },
+          category: true,
+          user: { select: { id: true, name: true } },
+          scenes: { select: { id: true } },
+        },
+      },
+    },
+  });
+
+  return userCourses.map((uc) => {
+    const stage = stageFromDB(uc.stage);
+    return {
+      ...stage,
+      sceneCount: uc.stage.scenes.length,
+      learningMode: stage.learningMode,
+      supportedModes: (uc.stage as any).directorConfig?.supportedModes,
+      coverImage: uc.stage.coverImage || undefined,
+    } as EnrolledStageItem;
+  });
+}
+
+export async function enrollCourse(
+  userId: string,
+  stageId: string,
+  source: 'self_selected' | 'assigned' = 'self_selected',
+): Promise<void> {
+  try {
+    await prisma.userCourse.upsert({
+      where: {
+        userId_stageId: { userId, stageId },
+      },
+      create: {
+        userId,
+        stageId,
+        source,
+        status: 'active',
+      },
+      update: {
+        source,
+        status: 'active',
+      },
+    });
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return;
+    }
+    throw error;
+  }
+}
+
 // ==================== Cascade Delete ====================
 
 export async function deleteStageWithRelatedData(stageId: string): Promise<void> {
@@ -775,6 +951,8 @@ export async function deleteStageWithRelatedData(stageId: string): Promise<void>
     prisma.stageOutlines.deleteMany({ where: { stageId } }),
     prisma.mediaFile.deleteMany({ where: { stageId } }),
     prisma.generatedAgent.deleteMany({ where: { stageId } }),
+    prisma.courseSummary.deleteMany({ where: { stageId } }),
+    prisma.userCourse.deleteMany({ where: { stageId } }),
     prisma.stage.delete({ where: { id: stageId } }),
   ]);
 }

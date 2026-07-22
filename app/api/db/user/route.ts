@@ -19,7 +19,50 @@ export async function GET(request: NextRequest) {
   const start = Date.now();
   const url = request.url;
   try {
+    const searchParams = request.nextUrl.searchParams;
+    const pageStr = searchParams.get('page');
+    const limitStr = searchParams.get('limit');
+    const search = searchParams.get('search') || '';
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { username: { contains: search } },
+      ];
+    }
+
+    if (pageStr) {
+      const page = parseInt(pageStr || '1');
+      const limit = parseInt(limitStr || '10');
+      const total = await prisma.user.count({ where });
+
+      const users = await prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          name: true,
+          avatar: true,
+          role: true,
+          providerType: true,
+          enabled: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+
+      apiLog('user', 'GET', url, { page, limit, search }, 200, Date.now() - start);
+      return NextResponse.json({ success: true, data: users, total, page, limit });
+    }
+
+    // fallback to original all-users list
     const users = await prisma.user.findMany({
+      where,
       select: {
         id: true,
         username: true,
@@ -28,6 +71,7 @@ export async function GET(request: NextRequest) {
         avatar: true,
         role: true,
         providerType: true,
+        enabled: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -94,10 +138,30 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Missing user id' }, { status: 400 });
       }
 
+      const existingUser = await prisma.user.findUnique({
+        where: { id: data.id },
+      });
+      if (!existingUser) {
+        return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+      }
+
+      // Rule: Admin or 'admin' account cannot be disabled or change its role.
+      const isAdmin = existingUser.role === 'admin' || existingUser.username === 'admin';
+      
+      if (isAdmin) {
+        if (data.enabled === false) {
+          return NextResponse.json({ error: '管理员账号无法被禁用' }, { status: 400 });
+        }
+        if (data.role !== undefined && data.role !== existingUser.role) {
+          return NextResponse.json({ error: '管理员账号的角色权限无法修改' }, { status: 400 });
+        }
+      }
+
       const updateData: Record<string, unknown> = {};
       if (data.name !== undefined) updateData.name = data.name;
       if (data.email !== undefined) updateData.email = data.email || null;
       if (data.role !== undefined) updateData.role = data.role;
+      if (data.enabled !== undefined) updateData.enabled = data.enabled;
       if (data.password) {
         updateData.passwordHash = await bcrypt.hash(data.password, 10);
       }

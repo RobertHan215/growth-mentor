@@ -59,6 +59,9 @@ interface StageState {
   // Persisted outlines for resume-on-refresh
   outlines: SceneOutline[];
 
+  // Raw PDF text from the uploaded document (kept in memory, not persisted)
+  pdfText: string;
+
   // Transient generation tracking (not persisted)
   generationEpoch: number;
   generationStatus: 'idle' | 'generating' | 'paused' | 'completed' | 'error';
@@ -75,6 +78,7 @@ interface StageState {
   setChats: (chats: ChatSession[]) => void;
   setMode: (mode: StageMode) => void;
   setToolbarState: (state: ToolbarState) => void;
+  setPdfText: (pdfText: string) => void;
   setGeneratingOutlines: (outlines: SceneOutline[]) => void;
   setOutlines: (outlines: SceneOutline[]) => void;
   setGenerationStatus: (status: 'idle' | 'generating' | 'paused' | 'completed' | 'error') => void;
@@ -105,6 +109,7 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
   toolbarState: 'ai',
   generatingOutlines: [],
   outlines: [],
+  pdfText: '',
   generationEpoch: 0,
   generationStatus: 'idle' as const,
   currentGeneratingOrder: -1,
@@ -192,6 +197,8 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
   setMode: (mode) => set({ mode }),
 
   setToolbarState: (toolbarState) => set({ toolbarState }),
+
+  setPdfText: (pdfText) => set({ pdfText }),
 
   setGeneratingOutlines: (generatingOutlines) => set({ generatingOutlines }),
 
@@ -322,6 +329,7 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
       currentSceneId: null,
       chats: [],
       outlines: [],
+      pdfText: '',
       generationEpoch: s.generationEpoch + 1,
       generationStatus: 'idle' as const,
       currentGeneratingOrder: -1,

@@ -83,6 +83,9 @@ export type TTSProviderId =
   | 'glm-tts'
   | 'qwen-tts'
   | 'elevenlabs-tts'
+  | 'minimax-tts'
+  | 'custom-minimax-tts'
+  | 'doubao-tts'
   | 'browser-native-tts';
 // Add new TTS providers below (uncomment and modify):
 // | 'fish-audio-tts'
@@ -141,7 +144,7 @@ export interface TTSModelConfig {
  * Add new ASR providers here as union members.
  * Keep in sync with ASR_PROVIDERS registry in constants.ts
  */
-export type ASRProviderId = 'openai-whisper' | 'browser-native' | 'qwen-asr';
+export type ASRProviderId = 'openai-whisper' | 'browser-native' | 'qwen-asr' | 'third-party-asr';
 // Add new ASR providers below (uncomment and modify):
 // | 'elevenlabs-asr'
 // | 'assemblyai-asr'
@@ -169,4 +172,5 @@ export interface ASRModelConfig {
   apiKey?: string;
   baseUrl?: string;
   language?: string;
+  thirdPartyEndpointType?: 'legacy-json' | 'funasr';
 }

@@ -1,46 +1,45 @@
-import { withAuth } from 'next-auth/middleware';
+import { getToken } from 'next-auth/jwt';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default withAuth(
-  function middleware(req) {
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // 公开路径，不需要认证
+  const publicPaths = ['/login', '/api/auth', '/api/server-providers', '/callback'];
+  if (publicPaths.some((path) => pathname.startsWith(path))) {
     return NextResponse.next();
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const { pathname } = req.nextUrl;
+  }
 
-        // 公开路径，不需要认证
-        const publicPaths = ['/login', '/api/auth'];
+  // 静态资源不需要认证
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.includes('.') // 文件资源
+  ) {
+    return NextResponse.next();
+  }
 
-        if (publicPaths.some((path) => pathname.startsWith(path))) {
-          return true;
-        }
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-        // 静态资源不需要认证
-        if (
-          pathname.startsWith('/_next') ||
-          pathname.startsWith('/favicon') ||
-          pathname.includes('.') // 文件资源
-        ) {
-          return true;
-        }
+  // Admin 路由需要 admin 权限
+  if (pathname.startsWith('/admin')) {
+    if (token?.role !== 'admin') {
+      const loginUrl = new URL('/login', req.url);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
 
-        // 其他路径需要认证
-        return !!token;
-      },
-    },
-  },
-);
+  // 其他路径需要认证
+  if (!token) {
+    const loginUrl = new URL('/login', req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: [
-    /*
-     * 匹配所有路径除了:
-     * - _next/static (静态文件)
-     * - _next/image (图片优化文件)
-     * - favicon.ico (网站图标)
-     */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

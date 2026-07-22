@@ -21,6 +21,58 @@ export function parseJsonResponse<T>(response: string): T | null {
     }
   }
 
+  // Strategy 1.1: Handle UNCLOSED code blocks (output truncated by max_model_len)
+  // When vLLM cuts off output, we get ```json\n[...] without closing ```
+  const unclosedCodeBlock = response.match(/```(?:json)?\s*([\s\S]+)$/);
+  if (unclosedCodeBlock) {
+    const extracted = unclosedCodeBlock[1].trim();
+    if (extracted.startsWith('{') || extracted.startsWith('[')) {
+      const result = tryParseJson<T>(extracted);
+      if (result !== null) {
+        log.debug('Successfully parsed JSON from unclosed code block (truncated output)');
+        return result;
+      }
+    }
+  }
+
+  // Strategy 1.5: Search from the END of the response.
+  // Thinking models (e.g. Qwen3-VL-Thinking) emit reasoning text BEFORE the
+  // JSON answer, so the last complete JSON structure is more likely to be
+  // the real output than the first one (which may be an example in the reasoning).
+  const lastBrace = response.lastIndexOf('}');
+  const lastBracket = response.lastIndexOf(']');
+  const lastClose = Math.max(lastBrace, lastBracket);
+  if (lastClose !== -1) {
+    // Walk backwards to find the matching open bracket
+    const closeChar = response[lastClose];
+    const openChar = closeChar === '}' ? '{' : '[';
+    let depth = 0;
+    let startIndex = -1;
+    let inString = false;
+    let escapeNext = false;
+    for (let i = lastClose; i >= 0; i--) {
+      const char = response[i];
+      if (escapeNext) { escapeNext = false; continue; }
+      // Detect escape sequences (walking backwards, so check char AFTER i)
+      if (char === '\\' && !escapeNext) { escapeNext = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (char === closeChar) depth++;
+      else if (char === openChar) {
+        depth--;
+        if (depth === 0) { startIndex = i; break; }
+      }
+    }
+    if (startIndex !== -1) {
+      const jsonStr = response.substring(startIndex, lastClose + 1);
+      const result = tryParseJson<T>(jsonStr);
+      if (result !== null) {
+        log.debug('Successfully parsed JSON from end of response (thinking model)');
+        return result;
+      }
+    }
+  }
+
   // Strategy 2: Try to find JSON structure directly in response (no code block)
   // Look for array or object start
   const jsonStartArray = response.indexOf('[');
@@ -89,7 +141,9 @@ export function parseJsonResponse<T>(response: string): T | null {
   }
 
   log.error('Failed to parse JSON from response');
-  log.error('Raw response (first 500 chars):', response.substring(0, 500));
+  log.error(
+    `Raw response (first 2000 chars):\n${response.substring(0, 2000)}${response.length > 2000 ? `\n... [truncated, total ${response.length} chars]` : ''}`,
+  );
 
   return null;
 }

@@ -23,6 +23,9 @@ export {
   formatImageDescription,
   formatImagePlaceholder,
   buildVisionUserContent,
+  resizeImagesForVision,
+  resizeImageForVision,
+  VISION_IMAGE_MAX_PX,
 } from './prompt-formatters';
 
 // JSON repair
@@ -48,3 +51,15 @@ export {
 
 // Pipeline runner
 export { createGenerationSession, runGenerationPipeline } from './pipeline-runner';
+
+// PDF chunking utilities (Stage 1 extension)
+export {
+  splitPdfTextIntoPages,
+  calculatePagesPerChunk,
+  buildPdfChunks,
+} from './pdf-chunker';
+export type { PdfChunk } from './pdf-chunker';
+
+// Chunked outline generator
+export { generateChunkedOutlines } from './outline-chunked-generator';
+export type { ChunkedOutlineOptions } from './outline-chunked-generator';

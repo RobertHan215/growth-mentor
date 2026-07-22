@@ -18,7 +18,10 @@ import type { StatelessChatRequest, StatelessEvent } from '@/lib/types/chat';
 import type { ThinkingConfig } from '@/lib/types/provider';
 import { apiError } from '@/lib/server/api-response';
 import { createLogger } from '@/lib/logger';
-import { resolveModel } from '@/lib/server/resolve-model';
+import {
+  resolveModelWithDefaults,
+  shouldUseFrontendModelConfigFromBody,
+} from '@/lib/server/resolve-model';
 const log = createLogger('Chat API');
 
 // Allow streaming responses up to 60 seconds
@@ -59,12 +62,13 @@ export async function POST(req: NextRequest) {
       return apiError('MISSING_REQUIRED_FIELD', 400, 'Missing required field: config.agentIds');
     }
 
-    const { model: languageModel, apiKey: resolvedApiKey } = resolveModel({
+    const { model: languageModel, apiKey: resolvedApiKey } = await resolveModelWithDefaults({
       modelString: body.model,
       apiKey: body.apiKey,
       baseUrl: body.baseUrl,
       providerType: body.providerType,
       requiresApiKey: body.requiresApiKey,
+      useClientConfig: shouldUseFrontendModelConfigFromBody(body),
     });
 
     if (!resolvedApiKey && body.requiresApiKey !== false) {

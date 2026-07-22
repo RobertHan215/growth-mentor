@@ -21,6 +21,8 @@ export interface PdfImage {
   storageId?: string; // Reference to IndexedDB (session_xxx_img_1)
   width?: number; // Image width (px or normalized)
   height?: number; // Image height (px or normalized)
+  /** Whether the image contains meaningful content (vs decorative). Set by image classifier. */
+  hasContent?: boolean;
 }
 
 /**

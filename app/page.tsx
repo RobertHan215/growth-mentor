@@ -8,6 +8,7 @@ import {
   Check,
   ChevronDown,
   Clock,
+  Compass,
   Copy,
   ImagePlus,
   Pencil,
@@ -22,6 +23,7 @@ import {
   User,
   Shield,
   Lock,
+  Trophy,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
 import { createLogger } from '@/lib/logger';
@@ -29,7 +31,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea as UITextarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { SettingsDialog } from '@/components/settings';
-import { UserManagementDialog } from '@/components/admin/user-management';
 import { PasswordDialog } from '@/components/settings/password-dialog';
 import { GenerationToolbar } from '@/components/generation/generation-toolbar';
 import { AgentBar } from '@/components/agent/agent-bar';
@@ -140,7 +141,7 @@ function HomePage() {
 
   const [languageOpen, setLanguageOpen] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
-  const [userManagementOpen, setUserManagementOpen] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<StageListItem[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, Slide>>({});
@@ -403,20 +404,41 @@ function HomePage() {
           )}
         </div>
 
-        {/* Admin Tools */}
+        {/* Discover — visible to ALL users */}
+        <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
+        <div className="relative">
+          <button
+            onClick={() => router.push('/discover')}
+            className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-white dark:hover:bg-gray-700 hover:text-red-600 dark:hover:text-red-400 hover:shadow-sm transition-all"
+            title="发现课堂"
+          >
+            <Compass className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* My Training — visible to ALL users */}
+        <div className="relative">
+          <button
+            onClick={() => router.push('/my-training')}
+            className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-white dark:hover:bg-gray-700 hover:text-amber-600 dark:hover:text-amber-400 hover:shadow-sm transition-all"
+            title="我的训练"
+          >
+            <Trophy className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Admin Tools — admin only */}
         {session?.user?.role === 'admin' && (
           <>
             <div className="w-[1px] h-4 bg-gray-200 dark:bg-gray-700" />
-            
-            <div className="relative">
-              <button
-                onClick={() => setUserManagementOpen(true)}
-                className="p-2 rounded-full text-gray-400 dark:text-gray-500 hover:bg-white dark:hover:bg-gray-700 hover:text-purple-600 dark:hover:text-purple-400 hover:shadow-sm transition-all"
-                title="用户管理"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            </div>
+
+            <button
+              onClick={() => router.push('/admin')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-xs font-semibold hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:shadow-sm transition-all"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              管理后台
+            </button>
 
             <div className="relative">
               <button
@@ -490,10 +512,6 @@ function HomePage() {
           if (!open) setSettingsSection(undefined);
         }}
         initialSection={settingsSection}
-      />
-      <UserManagementDialog
-        open={userManagementOpen}
-        onOpenChange={setUserManagementOpen}
       />
       <PasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
 

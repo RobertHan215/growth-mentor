@@ -35,6 +35,7 @@ import type {
   ThinkingConfig,
 } from '@/lib/types/provider';
 import { createLogger } from '@/lib/logger';
+import { asset } from '@/lib/branding';
 // NOTE: Do NOT import thinking-context.ts here — it uses node:async_hooks
 // which is server-only, and this file is also used on the client via
 // settings.ts. The thinking context is read from globalThis instead
@@ -55,13 +56,29 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://api.openai.com/v1',
     requiresApiKey: true,
-    icon: '/logos/openai.svg',
+    icon: asset('/logos/openai.svg'),
     models: [
       {
         id: 'qwen3-32b',
         name: 'qwen3-32b',
-        contextWindow: 16384,
-        outputWindow: 4096,
+        contextWindow: 32768,
+        outputWindow: 8192,
+        capabilities: {
+          streaming: true,
+          tools: true,
+          vision: false,
+          thinking: {
+            toggleable: true,
+            budgetAdjustable: true,
+            defaultEnabled: false,
+          },
+        },
+      },
+      {
+        id: 'Qwen3-VL-32B-Thinking',
+        name: 'Qwen3-VL-32B-Thinking',
+        contextWindow: 32768,
+        outputWindow: 8192,
         capabilities: {
           streaming: true,
           tools: true,
@@ -247,7 +264,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'anthropic',
     requiresApiKey: true,
     defaultBaseUrl: 'https://api.anthropic.com/v1',
-    icon: '/logos/claude.svg',
+    icon: asset('/logos/claude.svg'),
     models: [
       {
         id: 'claude-opus-4-6',
@@ -322,7 +339,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'google',
     requiresApiKey: true,
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    icon: '/logos/gemini.svg',
+    icon: asset('/logos/gemini.svg'),
     models: [
       {
         id: 'gemini-3.1-pro-preview',
@@ -429,7 +446,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     requiresApiKey: true,
-    icon: '/logos/glm.svg',
+    icon: asset('/logos/glm.svg'),
     models: [
       // GLM-5 Series - Latest flagship model
       {
@@ -521,7 +538,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     requiresApiKey: true,
-    icon: '/logos/qwen.svg',
+    icon: asset('/logos/qwen.svg'),
     models: [
       {
         id: 'qwen3.5-flash',
@@ -560,7 +577,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
     requiresApiKey: true,
-    icon: '/logos/deepseek.svg',
+    icon: asset('/logos/deepseek.svg'),
     models: [
       {
         id: 'deepseek-chat',
@@ -603,7 +620,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://api.moonshot.cn/v1',
     requiresApiKey: true,
-    icon: '/logos/kimi.png',
+    icon: asset('/logos/kimi.png'),
     models: [
       // K2.5 Series (2026) - 1T MoE, 32B active parameters
       {
@@ -682,7 +699,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'anthropic',
     defaultBaseUrl: 'https://api.minimaxi.com/anthropic/v1',
     requiresApiKey: true,
-    icon: '/logos/minimax.svg',
+    icon: asset('/logos/minimax.svg'),
     models: [
       {
         id: 'MiniMax-M2.5',
@@ -721,7 +738,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://api.siliconflow.cn/v1',
     requiresApiKey: true,
-    icon: '/logos/siliconflow.svg',
+    icon: asset('/logos/siliconflow.svg'),
     models: [
       // DeepSeek Series
       {
@@ -821,7 +838,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     requiresApiKey: true,
-    icon: '/logos/doubao.svg',
+    icon: asset('/logos/doubao.svg'),
     models: [
       {
         id: 'doubao-seed-2-0-pro-260215',
@@ -860,7 +877,7 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
     type: 'openai',
     defaultBaseUrl: 'https://api.x.ai/v1',
     requiresApiKey: true,
-    icon: '/logos/grok.svg',
+    icon: asset('/logos/grok.svg'),
     models: [
       {
         id: 'grok-4.20-beta-0309-reasoning',
@@ -1040,7 +1057,7 @@ function getCompatThinkingBodyParams(
         return { thinking: { type: 'enabled' } };
       // Qwen uses { chat_template_kwargs: { enable_thinking: true } }
       case 'qwen':
-        return { chat_template_kwargs: { enable_thinking: false } };
+        return { chat_template_kwargs: { enable_thinking: true } };
       // SiliconFlow uses { enable_thinking: true }
       case 'siliconflow':
         return { enable_thinking: true };
@@ -1095,17 +1112,26 @@ export function getModel(config: ModelConfig): ModelWithInfo {
       // provider or thinking state. Add new entries here to handle other models.
       const MODEL_EXTRA_PARAMS: Record<string, Record<string, unknown>> = {
         'qwen3-32b': { chat_template_kwargs: { enable_thinking: false } },
+        // thinking_budget_tokens=0 disables thinking entirely for this vLLM deployment.
+        // chat_template_kwargs is kept as a fallback for other servers.
+        'Qwen3-VL-32B-Thinking': {
+          thinking_budget_tokens: 0,
+          chat_template_kwargs: { enable_thinking: false },
+        },
         // Add more model overrides here as needed, e.g.:
         // 'qwen3-14b': { chat_template_kwargs: { enable_thinking: false } },
       };
 
       // Apply the fetch wrapper when:
       // 1. It's a non-native OpenAI provider (custom openai-compatible), OR
-      // 2. The model has model-specific extra params configured above.
+      // 2. The model has model-specific extra params configured above, OR
+      // 3. The baseUrl points to a Qwen-compatible endpoint (even if providerId='openai').
+      //    This handles the case where users configure local Qwen servers as native OpenAI.
       const modelExtraParams = MODEL_EXTRA_PARAMS[config.modelId];
-      if (config.providerId !== 'openai' || modelExtraParams) {
+      const baseUrl = effectiveBaseUrl || '';
+      const isQwenCompatBaseUrl = /dashscope|qwen|aliyun|110\.43\.120\.39/.test(baseUrl);
+      if (config.providerId !== 'openai' || modelExtraParams || isQwenCompatBaseUrl) {
         const providerId = config.providerId;
-        const baseUrl = effectiveBaseUrl || '';
         openaiOptions.fetch = async (url: RequestInfo | URL, init?: RequestInit) => {
           // Read thinking config from globalThis (set by thinking-context.ts)
           const thinkingCtx = (globalThis as Record<string, unknown>).__thinkingContext as
@@ -1113,13 +1139,10 @@ export function getModel(config: ModelConfig): ModelWithInfo {
             | undefined;
           const thinking = thinkingCtx?.getStore?.() as ThinkingConfig | undefined;
           if (init?.body && typeof init.body === 'string') {
-            log.info(
-              `[fetch wrapper] providerId=${providerId}, modelId=${config.modelId}, baseUrl=${baseUrl}, hasThinking=${!!thinking}`,
-            );
+            const isQwenCompat = /dashscope|qwen|aliyun|110\.43\.120\.39/.test(baseUrl);
             let extra = thinking ? getCompatThinkingBodyParams(providerId, thinking) : undefined;
             // Auto-detect qwen-compatible endpoints by baseUrl
             // Covers: dashscope (阿里云), qwen, aliyun, and custom qwen-compatible deployments
-            const isQwenCompat = /dashscope|qwen|aliyun|110\.43\.120\.39/.test(baseUrl);
             if (!extra && isQwenCompat) {
               extra = { chat_template_kwargs: { enable_thinking: false } };
             }
@@ -1127,8 +1150,18 @@ export function getModel(config: ModelConfig): ModelWithInfo {
             if (modelExtraParams) {
               extra = { ...extra, ...modelExtraParams };
             }
+            // ── 详细诊断日志 ──────────────────────────────────────────
+            const enableThinking =
+              (extra as { chat_template_kwargs?: { enable_thinking?: boolean } } | undefined)
+                ?.chat_template_kwargs?.enable_thinking;
+            log.info(
+              `[fetch wrapper] providerId=${providerId} modelId=${config.modelId}` +
+              ` | isQwenCompat=${isQwenCompat} hasThinkingCtx=${!!thinking}` +
+              ` | modelExtraParams=${modelExtraParams ? JSON.stringify(modelExtraParams) : 'none'}` +
+              ` | enable_thinking=${enableThinking ?? '(not set)'}`,
+            );
+            // ─────────────────────────────────────────────────────────
             if (extra) {
-              log.info(`[fetch wrapper] injecting extra params:`, extra);
               try {
                 const body = JSON.parse(init.body);
                 Object.assign(body, extra);

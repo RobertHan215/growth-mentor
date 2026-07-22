@@ -8,9 +8,14 @@
 import { NextRequest } from 'next/server';
 import { nanoid } from 'nanoid';
 import { callLLM } from '@/lib/ai/llm';
+import { parseJsonResponse } from '@/lib/generation/generation-pipeline';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
-import { resolveModelFromHeaders } from '@/lib/server/resolve-model';
+import {
+  resolveTextModel,
+  suppressThinking,
+  suppressThinkingInUserPrompt,
+} from '@/lib/server/resolve-model';
 
 const log = createLogger('Agent Profiles API');
 
@@ -77,7 +82,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Model resolution from request headers ──
-    const { model: languageModel, modelString } = resolveModelFromHeaders(req);
+    // Use resolveTextModel to fall back from VL-Thinking to plain text model.
+    const { model: languageModel, modelString } = await resolveTextModel(req);
 
     // ── Build prompt ──
     const sceneSummary = sceneOutlines?.length
@@ -147,15 +153,16 @@ Return a JSON object with this exact structure:
     const result = await callLLM(
       {
         model: languageModel,
-        system: systemPrompt,
-        prompt: userPrompt,
+        system: suppressThinking(systemPrompt, modelString),
+        prompt: suppressThinkingInUserPrompt(userPrompt, modelString),
       },
       'agent-profiles',
     );
 
     // ── Parse LLM response ──
-    const rawText = stripCodeFences(result.text);
-    let parsed: {
+    // Use parseJsonResponse which can extract JSON from thinking-model output
+    // that may include reasoning text before the actual JSON object.
+    const parsed = parseJsonResponse<{
       agents: Array<{
         name: string;
         role: string;
@@ -165,12 +172,10 @@ Return a JSON object with this exact structure:
         priority: number;
         voice?: string;
       }>;
-    };
+    }>(result.text);
 
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      log.error('Failed to parse LLM response as JSON:', rawText.substring(0, 500));
+    if (!parsed) {
+      log.error('Failed to parse LLM response as JSON:', result.text.substring(0, 500));
       return apiError('PARSE_FAILED', 500, 'Failed to parse agent profiles from LLM response');
     }
 

@@ -32,6 +32,8 @@ import type {
   ASRProviderId,
   ASRProviderConfig,
 } from './types';
+import { asset } from '@/lib/branding';
+
 
 /**
  * TTS Provider Registry
@@ -45,7 +47,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     name: 'OpenAI TTS',
     requiresApiKey: true,
     defaultBaseUrl: 'https://api.openai.com/v1',
-    icon: '/logos/openai.svg',
+    icon: asset('/logos/openai.svg'),
     voices: [
       // Recommended voices (best quality)
       {
@@ -150,7 +152,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     name: 'Azure TTS',
     requiresApiKey: true,
     defaultBaseUrl: 'https://{region}.tts.speech.microsoft.com',
-    icon: '/logos/azure.svg',
+    icon: asset('/logos/azure.svg'),
     voices: [
       {
         id: 'zh-CN-XiaoxiaoNeural',
@@ -193,7 +195,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     name: 'GLM TTS',
     requiresApiKey: true,
     defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    icon: '/logos/glm.svg',
+    icon: asset('/logos/glm.svg'),
     voices: [
       {
         id: 'tongtong',
@@ -254,7 +256,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     name: 'Qwen TTS (阿里云百炼)',
     requiresApiKey: true,
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/api/v1',
-    icon: '/logos/bailian.svg',
+    icon: asset('/logos/bailian.svg'),
     voices: [
       // Standard Mandarin voices
       {
@@ -611,7 +613,7 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     name: 'ElevenLabs TTS',
     requiresApiKey: true,
     defaultBaseUrl: 'https://api.elevenlabs.io/v1',
-    icon: '/logos/elevenlabs.svg',
+    icon: asset('/logos/elevenlabs.svg'),
     // Free-tier-safe fallback set; account-specific/custom voices should come from /v2/voices dynamically later.
     voices: [
       {
@@ -668,11 +670,111 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     speedRange: { min: 0.7, max: 1.2, default: 1.0 },
   },
 
+  'minimax-tts': {
+    id: 'minimax-tts',
+    name: 'MiniMax TTS',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://api.minimaxi.com/v1',
+    icon: asset('/logos/minimax.svg'),
+    voices: [
+      // Female voices
+      {
+        id: 'female-tianmei',
+        name: '甜美女声',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '甜美亲和的女声，适合客服和教学场景',
+      },
+      {
+        id: 'female-shaonv',
+        name: '少女音色',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '年轻活泼的少女声音',
+      },
+      {
+        id: 'female-yujie',
+        name: '御姐音色',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '成熟知性的御姐声音',
+      },
+      {
+        id: 'female-chengshu',
+        name: '成熟女声',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '沉稳大气的成熟女声',
+      },
+      // Male voices
+      {
+        id: 'male-qn-qingse',
+        name: '青涩青年',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '清新自然的青年男声',
+      },
+      {
+        id: 'male-qn-jingying',
+        name: '精英青年',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '自信干练的精英男声',
+      },
+      {
+        id: 'male-qn-badao',
+        name: '霸道青年',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '有气场的霸道男声',
+      },
+      {
+        id: 'male-qn-daxuesheng',
+        name: '大学生',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '阳光积极的大学生声音',
+      },
+      // Presenter/narrator
+      {
+        id: 'presenter_male',
+        name: '男主持人',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '专业播音腔男声',
+      },
+      {
+        id: 'presenter_female',
+        name: '女主持人',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '专业播音腔女声',
+      },
+      // English voices
+      {
+        id: 'female-yujie-jingpin',
+        name: '精品御姐',
+        language: 'zh-CN',
+        gender: 'female',
+        description: '高质感御姐声音，适合正式场景',
+      },
+      {
+        id: 'male-qn-qingse-jingpin',
+        name: '精品青年',
+        language: 'zh-CN',
+        gender: 'male',
+        description: '高质感青年声音，适合正式场景',
+      },
+    ],
+    supportedFormats: ['mp3', 'wav', 'flac'],
+    speedRange: { min: 0.5, max: 2.0, default: 1.0 },
+  },
+
   'browser-native-tts': {
     id: 'browser-native-tts',
     name: '浏览器原生 (Web Speech API)',
     requiresApiKey: false,
-    icon: '/logos/browser.svg',
+    icon: asset('/logos/browser.svg'),
     voices: [
       // Note: Actual voices are determined by the browser and OS
       // These are placeholder - real voices are fetched dynamically via speechSynthesis.getVoices()
@@ -680,6 +782,60 @@ export const TTS_PROVIDERS: Record<TTSProviderId, TTSProviderConfig> = {
     ],
     supportedFormats: ['browser'], // Browser native audio
     speedRange: { min: 0.1, max: 10.0, default: 1.0 },
+  },
+  // ============================================================
+  // MOSS TTS Nano — Custom TTS Service (声音克隆)
+  // Endpoint: http://110.43.120.39/ai-tts/v1/t2a_v2
+  // API Key:  TTS_CUSTOM_MINIMAX_API_KEY env var
+  //
+  // voice_id → wav 对照表:
+  //   Junhao → zh_1.wav  中文男声 A (默认)
+  //   Xiaoyu → zh_3.wav  中文女声 A
+  //   Yuewen → zh_4.wav  中文女声 B
+  //   Lingyu → zh_6.wav  中文女声 C
+  //   Ava    → en_2.wav  英文女声 A
+  //   Bella  → en_3.wav  英文女声 B
+  //   Adam   → en_4.wav  英文男声 A
+  //   Yui    → jp_2.wav  日文女声 B
+  // ============================================================
+  'custom-minimax-tts': {
+    id: 'custom-minimax-tts',
+    name: 'MOSS TTS Nano',
+    requiresApiKey: true,
+    defaultBaseUrl: 'http://110.43.120.39/ai-tts/v1',
+    icon: asset('/logos/minimax.svg'),
+    voices: [
+      // ── 中文 ──
+      { id: 'Junhao', name: '标准男生', language: 'zh-CN', gender: 'male' as const },
+      { id: 'Lingyu', name: '标准女生', language: 'zh-CN', gender: 'female' as const },
+      { id: 'Xiaoyu', name: '男生2号', language: 'zh-CN', gender: 'female' as const },
+      { id: 'Yuewen', name: '台湾腔', language: 'zh-TW', gender: 'female' as const },
+      // ── 英文 ──
+      { id: 'Ava', name: '美系女1', language: 'en-US', gender: 'female' as const },
+      { id: 'Bella', name: '美系女2', language: 'en-US', gender: 'female' as const },
+      { id: 'Adam', name: '美系男1', language: 'en-US', gender: 'male' as const },
+      // ── 日文 ──
+      { id: 'Yui', name: '日系女1', language: 'ja-JP', gender: 'female' as const },
+    ],
+    supportedFormats: ['mp3', 'wav'],
+    speedRange: { min: 0.5, max: 2.0, default: 1.0 },
+  },
+  'doubao-tts': {
+    id: 'doubao-tts',
+    name: '火山豆包 TTS',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://openspeech.bytedance.com/api/v3/tts/unidirectional',
+    icon: asset('/logos/doubao.svg'),
+    voices: [
+      { id: 'S_eyanjtm52', name: '参考音色 (S_eyanjtm52)', language: 'zh-CN', gender: 'female' as const },
+      { id: 'zh_female_changsheng', name: '常用女声 (常青)', language: 'zh-CN', gender: 'female' as const },
+      { id: 'zh_male_narrator', name: '叙事男声', language: 'zh-CN', gender: 'male' as const },
+      { id: 'zh_female_story', name: '情感女声', language: 'zh-CN', gender: 'female' as const },
+      { id: 'zh_male_assistant', name: '亲和男声', language: 'zh-CN', gender: 'male' as const },
+      { id: 'zh_female_assistant', name: '亲和女声', language: 'zh-CN', gender: 'female' as const },
+    ],
+    supportedFormats: ['mp3', 'wav'],
+    speedRange: { min: 0.5, max: 2.0, default: 1.0 },
   },
 };
 
@@ -695,7 +851,7 @@ export const ASR_PROVIDERS: Record<ASRProviderId, ASRProviderConfig> = {
     name: 'OpenAI Whisper',
     requiresApiKey: true,
     defaultBaseUrl: 'https://api.openai.com/v1',
-    icon: '/logos/openai.svg',
+    icon: asset('/logos/openai.svg'),
     supportedLanguages: [
       // OpenAI Whisper supports 58 languages (as of official docs)
       // Source: https://platform.openai.com/docs/guides/speech-to-text
@@ -768,7 +924,7 @@ export const ASR_PROVIDERS: Record<ASRProviderId, ASRProviderConfig> = {
     name: 'Qwen ASR (阿里云百炼)',
     requiresApiKey: true,
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/api/v1',
-    icon: '/logos/bailian.svg',
+    icon: asset('/logos/bailian.svg'),
     supportedLanguages: [
       // Qwen ASR supports 27 languages + auto-detect
       // If language is uncertain or mixed (e.g. Chinese-English-Japanese-Korean), use "auto" (do not specify language parameter)
@@ -805,12 +961,26 @@ export const ASR_PROVIDERS: Record<ASRProviderId, ASRProviderConfig> = {
     ],
     supportedFormats: ['mp3', 'wav', 'webm', 'm4a', 'flac'],
   },
+  'third-party-asr': {
+    id: 'third-party-asr',
+    name: '第三方语音识别',
+    requiresApiKey: true,
+    // baseUrl is required and must be configured by the user (no universal default)
+    icon: asset('/logos/browser.svg'),
+    supportedLanguages: [
+      '8k_zh', // 中文电话通用（默认）
+      '16k_zh', // 中文通用
+      '16k_ca', // 粤语
+      '16k_other', // 其他国内方言
+    ],
+    supportedFormats: ['wav', 'mp3', 'amr'],
+  },
 
   'browser-native': {
     id: 'browser-native',
     name: '浏览器原生 ASR (Web Speech API)',
     requiresApiKey: false,
-    icon: '/logos/browser.svg',
+    icon: asset('/logos/browser.svg'),
     supportedLanguages: [
       // Chinese variants
       'zh-CN', // Mandarin (Simplified, China)
@@ -896,6 +1066,9 @@ export const DEFAULT_TTS_VOICES: Record<TTSProviderId, string> = {
   'glm-tts': 'tongtong',
   'qwen-tts': 'Cherry',
   'elevenlabs-tts': 'EXAVITQu4vr4xnSDxMaL',
+  'minimax-tts': 'female-tianmei',
+  'custom-minimax-tts': 'Junhao',
+  'doubao-tts': 'S_eyanjtm52',
   'browser-native-tts': 'default',
 };
 

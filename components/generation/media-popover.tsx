@@ -37,6 +37,7 @@ import { ASR_PROVIDERS, getASRSupportedLanguages } from '@/lib/audio/constants';
 import type { ImageProviderId, VideoProviderId } from '@/lib/media/types';
 import type { TTSProviderId, ASRProviderId } from '@/lib/audio/types';
 import type { SettingsSection } from '@/lib/types/settings';
+import { asset } from '@/lib/branding';
 
 interface MediaPopoverProps {
   onSettingsOpen: (section: SettingsSection) => void;
@@ -44,17 +45,17 @@ interface MediaPopoverProps {
 
 // ─── Provider icon maps ───
 const IMAGE_PROVIDER_ICONS: Record<string, string> = {
-  seedream: '/logos/doubao.svg',
-  'qwen-image': '/logos/bailian.svg',
-  'nano-banana': '/logos/gemini.svg',
-  'grok-image': '/logos/grok.svg',
+  seedream: asset('/logos/doubao.svg'),
+  'qwen-image': asset('/logos/bailian.svg'),
+  'nano-banana': asset('/logos/gemini.svg'),
+  'grok-image': asset('/logos/grok.svg'),
 };
 const VIDEO_PROVIDER_ICONS: Record<string, string> = {
-  seedance: '/logos/doubao.svg',
-  kling: '/logos/kling.svg',
-  veo: '/logos/gemini.svg',
-  sora: '/logos/openai.svg',
-  'grok-video': '/logos/grok.svg',
+  seedance: asset('/logos/doubao.svg'),
+  kling: asset('/logos/kling.svg'),
+  veo: asset('/logos/gemini.svg'),
+  sora: asset('/logos/openai.svg'),
+  'grok-video': asset('/logos/grok.svg'),
 };
 
 type TabId = 'image' | 'video' | 'tts' | 'asr';
@@ -89,6 +90,9 @@ function getTTSProviderName(providerId: TTSProviderId, t: (key: string) => strin
     'glm-tts': t('settings.providerGLMTTS'),
     'qwen-tts': t('settings.providerQwenTTS'),
     'elevenlabs-tts': t('settings.providerElevenLabsTTS'),
+    'minimax-tts': t('settings.providerMiniMaxTTS'),
+    'custom-minimax-tts': 'MOSS TTS Nano',
+    'doubao-tts': '火山豆包 TTS',
     'browser-native-tts': t('settings.providerBrowserNativeTTS'),
   };
   return names[providerId] || providerId;
@@ -164,6 +168,14 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
     id: string,
     needsKey: boolean,
   ) => !needsKey || !!configs[id]?.apiKey || !!configs[id]?.isServerConfigured;
+
+  const asrCfgOk = (id: ASRProviderId, needsKey: boolean) => {
+    const config = asrProvidersConfig[id];
+    if (id === 'third-party-asr' && config?.thirdPartyEndpointType === 'funasr') {
+      return !!config.baseUrl || !!config.isServerConfigured;
+    }
+    return cfgOk(asrProvidersConfig, id, needsKey);
+  };
 
   const ttsSpeedRange = TTS_PROVIDERS[ttsProviderId]?.speedRange;
 
@@ -294,7 +306,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
   const asrGroups = useMemo(
     () =>
       Object.values(ASR_PROVIDERS)
-        .filter((p) => cfgOk(asrProvidersConfig, p.id, p.requiresApiKey))
+        .filter((p) => asrCfgOk(p.id, p.requiresApiKey))
         .map((p) => ({
           groupId: p.id,
           groupName: p.name,
@@ -327,7 +339,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer select-none whitespace-nowrap border',
             enabledCount > 0
-              ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200/60 dark:border-violet-700/50'
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-200/60 dark:border-red-700/50'
               : 'text-muted-foreground/70 hover:text-foreground hover:bg-muted/60 border-border/50',
           )}
         >
@@ -361,7 +373,7 @@ export function MediaPopover({ onSettingsOpen }: MediaPopoverProps) {
                   <Icon className="size-3.5" />
                   <span className="hidden sm:inline">{tab.label}</span>
                   {isEnabled && !isActive && (
-                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-violet-500" />
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-red-500" />
                   )}
                 </button>
               );
@@ -480,7 +492,7 @@ function TabPanel({
         <Icon
           className={cn(
             'size-4 shrink-0 transition-colors',
-            enabled ? 'text-violet-600 dark:text-violet-400' : 'text-muted-foreground/50',
+            enabled ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground/50',
           )}
         />
         <span

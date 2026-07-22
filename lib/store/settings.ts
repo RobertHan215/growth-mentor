@@ -64,6 +64,7 @@ export interface SettingsState {
       enabled: boolean;
       isServerConfigured?: boolean;
       serverBaseUrl?: string;
+      thirdPartyEndpointType?: 'legacy-json' | 'funasr';
     }
   >;
 
@@ -131,6 +132,12 @@ export interface SettingsState {
   ttsEnabled: boolean;
   asrEnabled: boolean;
 
+  // Explicit per-browser overrides for database-backed defaults
+  useFrontendModelConfig: boolean;
+  useFrontendTTSConfig: boolean;
+  useFrontendASRConfig: boolean;
+  useFrontendPDFConfig: boolean;
+
   // Auto-config lifecycle flag (persisted)
   autoConfigApplied: boolean;
 
@@ -182,10 +189,19 @@ export interface SettingsState {
   ) => void;
   setASRProviderConfig: (
     providerId: ASRProviderId,
-    config: Partial<{ apiKey: string; baseUrl: string; enabled: boolean }>,
+    config: Partial<{
+      apiKey: string;
+      baseUrl: string;
+      enabled: boolean;
+      thirdPartyEndpointType: 'legacy-json' | 'funasr';
+    }>,
   ) => void;
   setTTSEnabled: (enabled: boolean) => void;
   setASREnabled: (enabled: boolean) => void;
+  setUseFrontendModelConfig: (enabled: boolean) => void;
+  setUseFrontendTTSConfig: (enabled: boolean) => void;
+  setUseFrontendASRConfig: (enabled: boolean) => void;
+  setUseFrontendPDFConfig: (enabled: boolean) => void;
 
   // PDF actions
   setPDFProvider: (providerId: PDFProviderId) => void;
@@ -268,13 +284,28 @@ const getDefaultAudioConfig = () => ({
     'glm-tts': { apiKey: '', baseUrl: '', enabled: false },
     'qwen-tts': { apiKey: '', baseUrl: '', enabled: false },
     'elevenlabs-tts': { apiKey: '', baseUrl: '', enabled: false },
+    'minimax-tts': { apiKey: '', baseUrl: '', enabled: false },
     'browser-native-tts': { apiKey: '', baseUrl: '', enabled: true },
   } as Record<TTSProviderId, { apiKey: string; baseUrl: string; enabled: boolean }>,
   asrProvidersConfig: {
     'openai-whisper': { apiKey: '', baseUrl: '', enabled: true },
     'browser-native': { apiKey: '', baseUrl: '', enabled: true },
     'qwen-asr': { apiKey: '', baseUrl: '', enabled: false },
-  } as Record<ASRProviderId, { apiKey: string; baseUrl: string; enabled: boolean }>,
+    'third-party-asr': {
+      apiKey: '',
+      baseUrl: '',
+      enabled: false,
+      thirdPartyEndpointType: 'legacy-json',
+    },
+  } as Record<
+    ASRProviderId,
+    {
+      apiKey: string;
+      baseUrl: string;
+      enabled: boolean;
+      thirdPartyEndpointType?: 'legacy-json' | 'funasr';
+    }
+  >,
 });
 
 // Initialize default PDF config
@@ -430,6 +461,44 @@ function ensureBuiltInVideoProviders(state: Partial<SettingsState>): void {
   });
 }
 
+/**
+ * Ensure ttsProvidersConfig includes all built-in TTS providers.
+ * Called on every rehydrate so newly added TTS providers appear automatically.
+ */
+function ensureBuiltInTTSProviders(state: Partial<SettingsState>): void {
+  if (!state.ttsProvidersConfig) return;
+  const defaultConfig = getDefaultAudioConfig().ttsProvidersConfig;
+  for (const pid of Object.keys(TTS_PROVIDERS)) {
+    const providerId = pid as TTSProviderId;
+    if (!state.ttsProvidersConfig[providerId]) {
+      state.ttsProvidersConfig[providerId] = defaultConfig[providerId] || {
+        apiKey: '',
+        baseUrl: '',
+        enabled: false,
+      };
+    }
+  }
+}
+
+/**
+ * Ensure asrProvidersConfig includes all built-in ASR providers.
+ * Called on every rehydrate so newly added ASR providers appear automatically.
+ */
+function ensureBuiltInASRProviders(state: Partial<SettingsState>): void {
+  if (!state.asrProvidersConfig) return;
+  const defaultConfig = getDefaultAudioConfig().asrProvidersConfig;
+  for (const pid of Object.keys(ASR_PROVIDERS)) {
+    const providerId = pid as ASRProviderId;
+    if (!state.asrProvidersConfig[providerId]) {
+      state.asrProvidersConfig[providerId] = defaultConfig[providerId] || {
+        apiKey: '',
+        baseUrl: '',
+        enabled: false,
+      };
+    }
+  }
+}
+
 // Migrate from old localStorage format
 const migrateFromOldStorage = () => {
   if (typeof window === 'undefined') return null;
@@ -550,6 +619,12 @@ export const useSettingsStore = create<SettingsState>()(
         // Audio feature toggles (on by default)
         ttsEnabled: true,
         asrEnabled: true,
+
+        // Database defaults are used unless the user explicitly opts into local overrides.
+        useFrontendModelConfig: false,
+        useFrontendTTSConfig: false,
+        useFrontendASRConfig: false,
+        useFrontendPDFConfig: false,
 
         autoConfigApplied: false,
 
@@ -707,6 +782,10 @@ export const useSettingsStore = create<SettingsState>()(
         },
         setTTSEnabled: (enabled) => set({ ttsEnabled: enabled }),
         setASREnabled: (enabled) => set({ asrEnabled: enabled }),
+        setUseFrontendModelConfig: (enabled) => set({ useFrontendModelConfig: enabled }),
+        setUseFrontendTTSConfig: (enabled) => set({ useFrontendTTSConfig: enabled }),
+        setUseFrontendASRConfig: (enabled) => set({ useFrontendASRConfig: enabled }),
+        setUseFrontendPDFConfig: (enabled) => set({ useFrontendPDFConfig: enabled }),
 
         // Web Search actions
         setWebSearchProvider: (providerId) => set({ webSearchProviderId: providerId }),
@@ -734,6 +813,12 @@ export const useSettingsStore = create<SettingsState>()(
               image: Record<string, { baseUrl?: string }>;
               video: Record<string, { baseUrl?: string }>;
               webSearch: Record<string, { baseUrl?: string }>;
+              defaults?: {
+                llm?: { providerId: string; modelId: string };
+                tts?: { providerId: string; voice?: string; speed?: number };
+                asr?: { providerId: string; language?: string };
+                pdf?: { providerId: string };
+              };
             };
 
             set((state) => {
@@ -756,16 +841,35 @@ export const useSettingsStore = create<SettingsState>()(
                 const key = pid as ProviderId;
                 if (newProvidersConfig[key]) {
                   const currentModels = newProvidersConfig[key].models;
-                  // When server specifies allowed models, filter the models list
-                  const filteredModels = info.models?.length
-                    ? currentModels.filter((m) => info.models!.includes(m.id))
-                    : currentModels;
+                  let mergedModels = currentModels;
+
+                  if (info.models?.length) {
+                    // Filter built-in models to those allowed by server
+                    const matched = currentModels.filter((m) => info.models!.includes(m.id));
+                    // For server-specified models NOT in built-in list, create entries dynamically
+                    const matchedIds = new Set(matched.map((m) => m.id));
+                    const dynamicModels = info.models
+                      .filter((mid) => !matchedIds.has(mid))
+                      .map((mid) => ({
+                        id: mid,
+                        name: mid,
+                        contextWindow: 128000,
+                        outputWindow: 8192,
+                        capabilities: {
+                          streaming: true,
+                          tools: true,
+                          vision: false,
+                        },
+                      }));
+                    // Server-specified models first (dynamic + matched), preserving server order
+                    mergedModels = [...dynamicModels, ...matched];
+                  }
+
                   newProvidersConfig[key] = {
                     ...newProvidersConfig[key],
                     isServerConfigured: true,
                     serverModels: info.models,
-                    serverBaseUrl: info.baseUrl,
-                    models: filteredModels,
+                    models: mergedModels,
                   };
                 }
               }
@@ -939,12 +1043,14 @@ export const useSettingsStore = create<SettingsState>()(
                 newTTSConfig,
                 ttsFallback,
                 'browser-native-tts' as TTSProviderId,
+                ['browser-native-tts' as TTSProviderId],
               );
               const validASRProvider = validateProvider(
                 state.asrProviderId,
                 newASRConfig,
                 asrFallback,
                 'browser-native' as ASRProviderId,
+                ['browser-native' as ASRProviderId],
               );
               const validPDFProvider = validateProvider(
                 state.pdfProviderId,
@@ -1023,14 +1129,16 @@ export const useSettingsStore = create<SettingsState>()(
               let autoVideoEnabled: boolean | undefined;
 
               if (!state.autoConfigApplied) {
-                // PDF: unpdf → mineru if server has it
+                // PDF: unpdf → mineru if server has it (first-time only)
                 if (newPDFConfig.mineru?.isServerConfigured && state.pdfProviderId === 'unpdf') {
                   autoPdfProvider = 'mineru' as PDFProviderId;
                 }
 
-                // TTS: select first server provider if current is not server-configured
+                // TTS: server-configured providers take priority on first run only
+                // (do NOT override user's selection on subsequent syncs)
                 const serverTtsIds = Object.keys(data.tts) as TTSProviderId[];
                 if (
+                  state.ttsProviderId !== 'browser-native-tts' &&
                   serverTtsIds.length > 0 &&
                   !newTTSConfig[state.ttsProviderId]?.isServerConfigured
                 ) {
@@ -1038,16 +1146,17 @@ export const useSettingsStore = create<SettingsState>()(
                   autoTtsVoice = DEFAULT_TTS_VOICES[autoTtsProvider] || 'default';
                 }
 
-                // ASR: select first server provider if current is not server-configured
+                // ASR: same logic, first-run only
                 const serverAsrIds = Object.keys(data.asr) as ASRProviderId[];
                 if (
+                  state.asrProviderId !== 'browser-native' &&
                   serverAsrIds.length > 0 &&
                   !newASRConfig[state.asrProviderId]?.isServerConfigured
                 ) {
                   autoAsrProvider = serverAsrIds[0];
                 }
 
-                // Image: first server provider
+                // Image: first server provider (first-time only)
                 const serverImageIds = Object.keys(data.image) as ImageProviderId[];
                 if (
                   serverImageIds.length > 0 &&
@@ -1061,7 +1170,7 @@ export const useSettingsStore = create<SettingsState>()(
                   autoImageEnabled = true;
                 }
 
-                // Video: first server provider
+                // Video: first server provider (first-time only)
                 const serverVideoIds = Object.keys(data.video || {}) as VideoProviderId[];
                 if (
                   serverVideoIds.length > 0 &&
@@ -1096,6 +1205,36 @@ export const useSettingsStore = create<SettingsState>()(
                   }
                 }
               }
+
+              const defaultLLMProvider =
+                !state.useFrontendModelConfig && data.defaults?.llm?.providerId
+                  ? (data.defaults.llm.providerId as ProviderId)
+                  : undefined;
+              const defaultLLMModel =
+                defaultLLMProvider && newProvidersConfig[defaultLLMProvider]
+                  ? validateModel(
+                      data.defaults?.llm?.modelId || '',
+                      newProvidersConfig[defaultLLMProvider].models ?? [],
+                    )
+                  : '';
+              const defaultTTSProvider =
+                !state.useFrontendTTSConfig &&
+                data.defaults?.tts?.providerId &&
+                newTTSConfig[data.defaults.tts.providerId as TTSProviderId]
+                  ? (data.defaults.tts.providerId as TTSProviderId)
+                  : undefined;
+              const defaultASRProvider =
+                !state.useFrontendASRConfig &&
+                data.defaults?.asr?.providerId &&
+                newASRConfig[data.defaults.asr.providerId as ASRProviderId]
+                  ? (data.defaults.asr.providerId as ASRProviderId)
+                  : undefined;
+              const defaultPDFProvider =
+                !state.useFrontendPDFConfig &&
+                data.defaults?.pdf?.providerId &&
+                newPDFConfig[data.defaults.pdf.providerId as PDFProviderId]
+                  ? (data.defaults.pdf.providerId as PDFProviderId)
+                  : undefined;
 
               return {
                 providersConfig: newProvidersConfig,
@@ -1160,6 +1299,30 @@ export const useSettingsStore = create<SettingsState>()(
                 }),
                 ...(autoProviderId && { providerId: autoProviderId }),
                 ...(autoModelId && { modelId: autoModelId }),
+                ...(defaultLLMProvider &&
+                  defaultLLMModel && {
+                    providerId: defaultLLMProvider,
+                    modelId: defaultLLMModel,
+                  }),
+                ...(defaultTTSProvider && {
+                  ttsProviderId: defaultTTSProvider,
+                  ttsVoice:
+                    data.defaults?.tts?.voice ||
+                    DEFAULT_TTS_VOICES[defaultTTSProvider] ||
+                    'default',
+                  ...(typeof data.defaults?.tts?.speed === 'number' && {
+                    ttsSpeed: data.defaults.tts.speed,
+                  }),
+                }),
+                ...(defaultASRProvider && {
+                  asrProviderId: defaultASRProvider,
+                  ...(data.defaults?.asr?.language && {
+                    asrLanguage: data.defaults.asr.language,
+                  }),
+                }),
+                ...(defaultPDFProvider && {
+                  pdfProviderId: defaultPDFProvider,
+                }),
               };
             });
           } catch (e) {
@@ -1171,7 +1334,7 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: 'settings-storage',
-      version: 2,
+      version: 3,
       // Migrate persisted state
       migrate: (persistedState: unknown, version: number) => {
         const state = persistedState as Partial<SettingsState>;
@@ -1185,6 +1348,10 @@ export const useSettingsStore = create<SettingsState>()(
 
         // Ensure providersConfig has all built-in providers (also in merge below)
         ensureBuiltInProviders(state);
+
+        // Ensure TTS config has all built-in TTS providers
+        ensureBuiltInTTSProviders(state);
+        ensureBuiltInASRProviders(state);
 
         // Ensure image/video configs have all built-in providers
         ensureBuiltInImageProviders(state);
@@ -1233,6 +1400,18 @@ export const useSettingsStore = create<SettingsState>()(
           delete (state as Record<string, unknown>).deepResearchProvidersConfig;
         }
 
+        // v2 → v3: TTS auto-switch was too aggressive — it forced minimax-tts on every sync.
+        // Reset to browser-native-tts for users who were switched without consent.
+        // (Users who manually selected minimax-tts will be re-prompted on next load via autoConfigApplied.)
+        if (version < 3) {
+          if (state.ttsProviderId === 'minimax-tts') {
+            state.ttsProviderId = 'browser-native-tts' as typeof state.ttsProviderId;
+            state.ttsVoice = 'default';
+          }
+          // Reset autoConfigApplied so first-run TTS selection fires once more
+          (state as Record<string, unknown>).autoConfigApplied = false;
+        }
+
         // Add default media generation toggles if missing
         if (state.imageGenerationEnabled === undefined) {
           state.imageGenerationEnabled = false;
@@ -1247,6 +1426,18 @@ export const useSettingsStore = create<SettingsState>()(
         }
         if ((state as Record<string, unknown>).asrEnabled === undefined) {
           (state as Record<string, unknown>).asrEnabled = true;
+        }
+        if ((state as Record<string, unknown>).useFrontendModelConfig === undefined) {
+          (state as Record<string, unknown>).useFrontendModelConfig = false;
+        }
+        if ((state as Record<string, unknown>).useFrontendTTSConfig === undefined) {
+          (state as Record<string, unknown>).useFrontendTTSConfig = false;
+        }
+        if ((state as Record<string, unknown>).useFrontendASRConfig === undefined) {
+          (state as Record<string, unknown>).useFrontendASRConfig = false;
+        }
+        if ((state as Record<string, unknown>).useFrontendPDFConfig === undefined) {
+          (state as Record<string, unknown>).useFrontendPDFConfig = false;
         }
 
         // Existing users already have their config set up — mark auto-config as done
@@ -1289,6 +1480,8 @@ export const useSettingsStore = create<SettingsState>()(
       merge: (persistedState, currentState) => {
         const merged = { ...currentState, ...(persistedState as object) };
         ensureBuiltInProviders(merged as Partial<SettingsState>);
+        ensureBuiltInTTSProviders(merged as Partial<SettingsState>);
+        ensureBuiltInASRProviders(merged as Partial<SettingsState>);
         ensureBuiltInImageProviders(merged as Partial<SettingsState>);
         ensureBuiltInVideoProviders(merged as Partial<SettingsState>);
         ensureValidProviderSelections(merged as Partial<SettingsState>);

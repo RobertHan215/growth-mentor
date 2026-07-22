@@ -23,6 +23,8 @@ export interface Stage {
   style?: string;
   whiteboard?: Whiteboard[];
   agentIds?: string[];
+  learningMode?: 'teaching' | 'oneOnOne';
+  oneOnOneTagId?: string | null;
 }
 
 /**

@@ -29,5 +29,7 @@ Based on the scene information above, generate a complete Canvas/PPT component f
 5. Use the provided image_id (e.g., `img_001`) for the `src` field of image elements
 6. All TextElement `height` values must be selected from the quick reference table in the system prompt
 
-**Output Structure Example**:
-{"background":{"type":"solid","color":"#ffffff"},"elements":[{"id":"title_001","type":"text","left":60,"top":50,"width":880,"height":76,"content":"<p style=\"font-size:32px;\"><strong>Title Content</strong></p>","defaultFontName":"","defaultColor":"#333333"},{"id":"content_001","type":"text","left":60,"top":150,"width":880,"height":130,"content":"<p style=\"font-size:18px;\">• Point One</p><p style=\"font-size:18px;\">• Point Two</p><p style=\"font-size:18px;\">• Point Three</p>","defaultFontName":"","defaultColor":"#333333"}]}
+**Design Requirements**:
+- **Be Creative & Professional**: DO NOT just output a single text block with bullet points. Use the shapes, lines, and multi-column card layouts described in the system prompt.
+- **Visual Hierarchy**: Use colored background shapes (`type: "shape"`) to group related points into cards.
+- **Layout**: If there are 2 or 3 parallel points, place them side-by-side using the multi-column layout rules. Use dividers (`type: "line"` or thin `shape`) to separate header from content.

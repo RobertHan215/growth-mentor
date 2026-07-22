@@ -26,11 +26,14 @@ export function validateProvider<T extends string>(
   configMap: Partial<Record<T, ProviderCfgLike>>,
   fallbackOrder: T[],
   defaultId?: T,
+  alwaysUsableIds: readonly T[] = [],
 ): T | '' {
   if (!currentId) return currentId;
+  if (alwaysUsableIds.includes(currentId)) return currentId;
   if (isProviderUsable(configMap[currentId])) return currentId;
 
   for (const id of fallbackOrder) {
+    if (alwaysUsableIds.includes(id)) return id;
     if (isProviderUsable(configMap[id])) return id;
   }
   return defaultId ?? '';

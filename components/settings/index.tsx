@@ -59,6 +59,7 @@ import { ModelEditDialog } from './model-edit-dialog';
 import { AddProviderDialog, type NewProviderData } from './add-provider-dialog';
 import type { SettingsSection, EditingModel } from '@/lib/types/settings';
 import { useSession } from 'next-auth/react';
+import { asset } from '@/lib/branding';
 
 // ─── Provider List Column (reusable) ───
 function ProviderListColumn<T extends string>({
@@ -123,6 +124,9 @@ function getTTSProviderName(providerId: TTSProviderId, t: (key: string) => strin
     'glm-tts': t('settings.providerGLMTTS'),
     'qwen-tts': t('settings.providerQwenTTS'),
     'elevenlabs-tts': t('settings.providerElevenLabsTTS'),
+    'minimax-tts': t('settings.providerMiniMaxTTS'),
+    'custom-minimax-tts': 'MOSS TTS Nano',
+    'doubao-tts': '火山豆包 TTS',
     'browser-native-tts': t('settings.providerBrowserNativeTTS'),
   };
   return names[providerId];
@@ -133,6 +137,7 @@ function getASRProviderName(providerId: ASRProviderId, t: (key: string) => strin
     'openai-whisper': t('settings.providerOpenAIWhisper'),
     'browser-native': t('settings.providerBrowserNative'),
     'qwen-asr': t('settings.providerQwenASR'),
+    'third-party-asr': t('settings.providerThirdPartyASR'),
   };
   return names[providerId];
 }
@@ -146,10 +151,10 @@ const IMAGE_PROVIDER_NAMES: Record<ImageProviderId, string> = {
 };
 
 const IMAGE_PROVIDER_ICONS: Record<ImageProviderId, string> = {
-  seedream: '/logos/doubao.svg',
-  'qwen-image': '/logos/bailian.svg',
-  'nano-banana': '/logos/gemini.svg',
-  'grok-image': '/logos/grok.svg',
+  seedream: asset('/logos/doubao.svg'),
+  'qwen-image': asset('/logos/bailian.svg'),
+  'nano-banana': asset('/logos/gemini.svg'),
+  'grok-image': asset('/logos/grok.svg'),
 };
 
 const VIDEO_PROVIDER_NAMES: Record<VideoProviderId, string> = {
@@ -161,11 +166,11 @@ const VIDEO_PROVIDER_NAMES: Record<VideoProviderId, string> = {
 };
 
 const VIDEO_PROVIDER_ICONS: Record<VideoProviderId, string> = {
-  seedance: '/logos/doubao.svg',
-  kling: '/logos/kling.svg',
-  veo: '/logos/gemini.svg',
-  sora: '/logos/openai.svg',
-  'grok-video': '/logos/grok.svg',
+  seedance: asset('/logos/doubao.svg'),
+  kling: asset('/logos/kling.svg'),
+  veo: asset('/logos/gemini.svg'),
+  sora: asset('/logos/openai.svg'),
+  'grok-video': asset('/logos/grok.svg'),
 };
 
 interface SettingsDialogProps {
@@ -814,7 +819,7 @@ export function SettingsDialog({ open, onOpenChange, initialSection }: SettingsD
           {activeSection === 'pdf' && (
             <>
               <ProviderListColumn
-                providers={Object.values(PDF_PROVIDERS).filter((p) => p.id !== 'mineru')}
+                providers={Object.values(PDF_PROVIDERS)}
                 configs={pdfProvidersConfig}
                 selectedId={selectedPdfProviderId}
                 onSelect={setSelectedPdfProviderId}

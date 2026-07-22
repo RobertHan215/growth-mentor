@@ -143,7 +143,7 @@ export function UserManagementDialog({ open, onOpenChange }: UserManagementDialo
         <div className="p-6 border-b border-border">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
-              <Shield className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
               用户管理
             </DialogTitle>
             <DialogDescription>

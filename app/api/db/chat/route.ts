@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'update') {
-      const { id: sessionId, ...fields } = data;
-      await updateChatSession(sessionId, fields);
+      const { id: sessionId, userId, ...fields } = data;
+      await updateChatSession(sessionId, userId, fields);
       apiLog('chat-db', 'POST', url, { action, data }, 200, Date.now() - start);
       return NextResponse.json({ success: true });
     }
 
     if (action === 'delete') {
-      await deleteChatSession(data.id);
+      await deleteChatSession(data.id, data.userId);
       apiLog('chat-db', 'POST', url, { action, data }, 200, Date.now() - start);
       return NextResponse.json({ success: true });
     }

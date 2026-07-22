@@ -10,21 +10,29 @@ datasource db {
 // ==================== 用户认证相关 ====================
 
 model User {
-  id           String    @id @default(uuid())
-  username     String?   @unique
-  passwordHash String?   @map("password_hash")
-  email        String?   @unique
+  id           String   @id @default(uuid())
+  username     String?  @unique
+  passwordHash String?  @map("password_hash")
+  email        String?  @unique
   name         String
   avatar       String?
-  role         String    @default("user")
-  providerType String    @default("credentials") @map("provider_type")
-  providerId   String?   @map("provider_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  role         String   @default("user")
+  providerType String   @default("credentials") @map("provider_type")
+  providerId   String?  @map("provider_id")
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  accounts Account[]
-  sessions Session[]
-  stages   Stage[]
+  accounts        Account[]
+  sessions        Session[]
+  stages          Stage[]
+  userCourses     UserCourse[]
+  trainingResults    TrainingResult[]
+  trainingWeaknesses TrainingWeakness[]
+  asyncTasks         AsyncTask[]
+  chatSessions       ChatSession[]
+  courseSummaries    CourseSummary[]
+  speechCorpora      SpeechCorpus[]
 
   @@map("users")
 }
@@ -60,34 +68,51 @@ model Session {
 // ==================== 课程数据 ====================
 
 model Stage {
-  id             String   @id
-  userId         String   @map("user_id")
-  name           String
-  description    String?  @db.Text
-  language       String?
-  style          String?
-  currentSceneId String?  @map("current_scene_id")
-  agentIds       String?  @map("agent_ids") @db.Text // JSON array
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                   String   @id
+  userId               String   @map("user_id")
+  name                 String
+  description          String?  @db.Text
+  language             String?
+  style                String?
+  currentSceneId       String?  @map("current_scene_id")
+  agentIds             String?  @map("agent_ids") @db.Text // JSON array
+  isPublished          Boolean  @default(true) @map("is_published")
+  categoryId           String?  @map("category_id")
+  learningMode         String   @default("teaching") @map("learning_mode")
+  directorConfig       Json?    @map("director_config") @db.Json
+  visibilityRoles      String?  @map("visibility_roles") @db.Text // JSON array: ["admin","manager"]
+  visibilityUsers      String?  @map("visibility_users") @db.Text // JSON array: ["userId1","userId2"]
+  coverImage           String?  @map("cover_image") @db.Text
+  oneOnOneTagId        String?  @map("one_on_one_tag_id")
+  characterTemplateIds String?  @map("character_template_ids") @db.Text
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scenes            Scene[]
-  chatSessions      ChatSession[]
-  playbackState     PlaybackState?
-  stageOutlines     StageOutlines?
-  mediaFiles        MediaFile[]
-  generatedAgents   GeneratedAgent[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenes          Scene[]
+  chatSessions    ChatSession[]
+  playbackState   PlaybackState?
+  stageOutlines   StageOutlines?
+  mediaFiles      MediaFile[]
+  generatedAgents GeneratedAgent[]
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  stageTags       StageTag[]
+  userCourses     UserCourse[]
+  trainingResults    TrainingResult[]
+  trainingWeaknesses TrainingWeakness[]
+  asyncTasks         AsyncTask[]
+  courseSummaries    CourseSummary[]
 
   @@index([userId])
   @@index([updatedAt])
+  @@index([categoryId])
   @@map("stages")
 }
 
 model Scene {
   id         String   @id
   stageId    String   @map("stage_id")
-  type       String   // 'slide' | 'quiz' | 'interactive' | 'pbl'
+  type       String // 'slide' | 'quiz' | 'interactive' | 'pbl'
   title      String
   order      Int
   content    Json     @db.Json
@@ -103,25 +128,80 @@ model Scene {
   @@map("scenes")
 }
 
+// ==================== 分类与标签 (Course Management) ====================
+
+model Category {
+  id       String     @id @default(uuid())
+  name     String
+  parentId String?    @map("parent_id")
+  parent   Category?  @relation("SubCategories", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("SubCategories")
+  stages   Stage[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id                    String                 @id @default(uuid())
+  name                  String                 @unique
+  color                 String?                @default("#E2E8F0")
+  stages                StageTag[]
+  oneOnOneScoringConfig OneOnOneScoringConfig?
+
+  @@map("tags")
+}
+
+model StageTag {
+  stageId String @map("stage_id")
+  tagId   String @map("tag_id")
+  stage   Stage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([stageId, tagId])
+  @@index([tagId])
+  @@map("stage_tags")
+}
+
+model UserCourse {
+  userId  String @map("user_id")
+  stageId String @map("stage_id")
+  source  String @default("self_selected") // 'self_selected' | 'assigned'
+  status  String @default("active") // 'active' | 'completed' | 'dropped'
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([userId, stageId])
+  @@index([userId])
+  @@index([stageId])
+  @@map("user_courses")
+}
+
 // ==================== 聊天相关 ====================
 
 model ChatSession {
-  id                String   @id
-  stageId           String   @map("stage_id")
-  sceneId           String?  @map("scene_id")
-  type              String   // 'qa' | 'discussion' | 'lecture'
-  title             String
-  status            String   // 'active' | 'archived'
-  messages          Json     @db.Json
-  config            Json     @db.Json
-  toolCalls         Json     @db.Json
-  pendingToolCalls  Json     @db.Json
-  lastActionIndex   Int?     @map("last_action_index")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id
+  userId           String?  @map("user_id")
+  stageId          String   @map("stage_id")
+  sceneId          String?  @map("scene_id")
+  type             String // 'qa' | 'discussion' | 'lecture'
+  title            String
+  status           String // 'active' | 'archived'
+  messages         Json     @db.Json
+  config           Json     @db.Json
+  toolCalls        Json     @db.Json
+  pendingToolCalls Json     @db.Json
+  lastActionIndex  Int?     @map("last_action_index")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
+  user  User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@index([stageId])
   @@index([stageId, createdAt])
   @@map("chat_sessions")
@@ -154,7 +234,7 @@ model GeneratedAgent {
   id        String   @id
   stageId   String   @map("stage_id")
   name      String
-  role      String   // 'teacher' | 'assistant' | 'student'
+  role      String // 'teacher' | 'assistant' | 'student'
   persona   String   @db.Text
   avatar    String
   color     String
@@ -196,7 +276,7 @@ model ImageFile {
 model MediaFile {
   id           String   @id // compound: stageId:elementId
   stageId      String   @map("stage_id")
-  type         String   // 'image' | 'video'
+  type         String // 'image' | 'video'
   blob         Bytes    @db.LongBlob
   mimeType     String   @map("mime_type")
   size         Int
@@ -216,13 +296,302 @@ model MediaFile {
   @@map("media_files")
 }
 
+// ==================== 训练评估结果 ====================
+
+model OneOnOneScoringConfig {
+  id          String   @id @default(uuid())
+  tagId       String   @unique @map("tag_id")
+  name        String
+  description String?  @db.Text
+  criteria    Json     @db.Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@index([enabled])
+  @@map("one_on_one_scoring_configs")
+}
+
+model TrainingResult {
+  id           String @id @default(uuid())
+  userId       String @map("user_id")
+  stageId      String @map("stage_id")
+  sceneId      String @map("scene_id")
+  sessionId    String @map("session_id")
+  difficulty   String // easy | medium | hard
+  scores       Json   @db.Json // DimensionScore[]
+  totalScore   Int    @map("total_score") // 0-100 weighted total
+  summary      String @db.Text // Director's overall comment
+  highlights   Json   @db.Json // string[]
+  improvements Json   @db.Json // string[]
+  objectives   Json   @db.Json // completed objectives string[]
+  rounds       Int // Actual dialogue rounds
+  duration     Int // Duration in seconds
+  // Keep columns that already exist in remote DB / training code paths
+  isRegenerated Boolean @default(false) @map("is_regenerated")
+  reportIndex   Int     @default(0) @map("report_index")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([userId, sceneId])
+  @@index([stageId])
+  @@map("training_results")
+}
+
+// ==================== 对练历史不足追踪 ====================
+
+model TrainingWeakness {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  stageId         String    @map("stage_id")
+  name            String                          // 不足项名称（如「共情表达」）
+  description     String    @db.Text              // 具体描述
+  suggestion      String    @db.Text              // 改进建议
+  status          String    @default("active")     // active | resolved
+  firstSeenAt     DateTime  @default(now()) @map("first_seen_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  sourceResultId  String    @map("source_result_id")
+  resolveResultId String?   @map("resolve_result_id")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([userId, stageId, status])
+  @@index([userId, stageId])
+  @@map("training_weaknesses")
+}
+
+model AsyncTask {
+  id            String    @id
+  type          String
+  status        String    @default("queued") // queued | running | succeeded | failed | cancelled
+  message       String    @db.Text
+  progress      Int       @default(0)
+  userId        String?   @map("user_id")
+  stageId       String?   @map("stage_id")
+  targetType    String?   @map("target_type")
+  targetId      String?   @map("target_id")
+  payload       Json      @db.Json
+  result        Json?     @db.Json
+  error         String?   @db.Text
+  retryOfTaskId String?   @map("retry_of_task_id")
+  attempt       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  startedAt     DateTime? @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  stage Stage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([status])
+  @@index([userId])
+  @@index([stageId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("async_tasks")
+}
+
+// ==================== 结课总结 ====================
+
+model CourseSummary {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  stageId   String   @map("stage_id")
+  content   Json     @db.Json // CourseSummaryContent JSON
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stage Stage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stageId])
+  @@index([userId])
+  @@index([stageId])
+  @@map("course_summaries")
+}
+
 // ==================== 撤销/重做快照 ====================
 
 model Snapshot {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   index     Int
-  slides    Json    @db.Json
+  slides    Json     @db.Json
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("snapshots")
+}
+
+// ==================== AI角色模板 ====================
+
+model AiCharacterTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?  @db.Text
+  personalityType String?  @map("personality_type")
+  profile         Json     @db.Json
+  dimensions      Json     @db.Json
+  tagIds          String?  @map("tag_ids") @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  speechSampleBindings CustomerSpeechSampleTemplate[]
+  speechProfile        CharacterSpeechProfile?
+
+  @@map("ai_character_templates")
+}
+
+// ==================== 真实客户话术库 ====================
+
+model SpeechCorpus {
+  id           String   @id @default(uuid())
+  name         String
+  sourceType   String   @default("asr_json") @map("source_type")
+  status       String   @default("imported")
+  count        Int      @default(0)
+  fullText     String?  @map("full_text") @db.LongText
+  dialogueText String?  @map("dialogue_text") @db.LongText
+  rawJson      Json     @map("raw_json") @db.Json
+  speakerMap   Json     @map("speaker_map") @db.Json
+  createdBy    String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  creator User                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  turns   SpeechTurn[]
+  samples CustomerSpeechSample[]
+
+  @@index([createdBy])
+  @@index([status])
+  @@index([createdAt])
+  @@map("speech_corpora")
+}
+
+model SpeechTurn {
+  id        String  @id @default(uuid())
+  corpusId  String  @map("corpus_id")
+  order     Int
+  speaker   String
+  role      String
+  text      String  @db.Text
+  startTime Float?  @map("start_time")
+  endTime   Float?  @map("end_time")
+
+  corpus SpeechCorpus @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+
+  @@index([corpusId, order])
+  @@index([corpusId, role])
+  @@map("speech_turns")
+}
+
+model CustomerSpeechSample {
+  id                    String    @id @default(uuid())
+  corpusId              String    @map("corpus_id")
+  collectorPrompt       String    @map("collector_prompt") @db.Text
+  customerLine          String    @map("customer_line") @db.Text
+  sanitizedCustomerLine String    @map("sanitized_customer_line") @db.Text
+  triggerAction         String    @map("trigger_action")
+  customerIntent        String    @map("customer_intent")
+  emotion               String
+  strategy              String
+  pressureLevel         String    @map("pressure_level")
+  dialogueStage         String    @map("dialogue_stage")
+  qualityScore          Int       @default(0) @map("quality_score")
+  enabled               Boolean   @default(true)
+  usageCount            Int       @default(0) @map("usage_count")
+  lastUsedAt            DateTime? @map("last_used_at")
+  sourceTurnOrder       Int?      @map("source_turn_order")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  corpus           SpeechCorpus                   @relation(fields: [corpusId], references: [id], onDelete: Cascade)
+  templateBindings CustomerSpeechSampleTemplate[]
+
+  @@index([corpusId])
+  @@index([triggerAction])
+  @@index([customerIntent])
+  @@index([strategy])
+  @@index([enabled, qualityScore])
+  @@map("customer_speech_samples")
+}
+
+model CustomerSpeechSampleTemplate {
+  sampleId   String @map("sample_id")
+  templateId String @map("template_id")
+
+  sample   CustomerSpeechSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  template AiCharacterTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@id([sampleId, templateId])
+  @@index([templateId])
+  @@map("customer_speech_sample_templates")
+}
+
+model CharacterSpeechProfile {
+  id                String   @id @default(uuid())
+  templateId        String   @unique @map("template_id")
+  summary           String?  @db.Text
+  tone              String?  @db.Text
+  rhythm            String?  @db.Text
+  commonPhrases     Json     @map("common_phrases") @db.Json
+  objectionPatterns Json     @map("objection_patterns") @db.Json
+  forbiddenStyle    Json     @map("forbidden_style") @db.Json
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  template AiCharacterTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("character_speech_profiles")
+}
+
+// ==================== 敏感词管理 ====================
+
+model SensitiveWord {
+  id        String   @id @default(uuid())
+  word      String   @unique // 敏感词文本（唯一）
+  category  String   @default("") // 分类（如"违规用语"/"竞品词"，可为空）
+  enabled   Boolean  @default(true) // 是否启用
+  createdBy String   @map("created_by") // 创建者 userId
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  logs SensitiveWordLog[]
+
+  @@index([enabled])
+  @@map("sensitive_words")
+}
+
+model SensitiveWordLog {
+  id             String   @id @default(uuid())
+  wordId         String   @map("word_id") // 命中的敏感词 ID
+  word           String // 冗余存储词文本（词被删除后仍可追溯）
+  userId         String   @map("user_id") // 触发用户 ID
+  source         String   @default("user") // "user" | "ai"
+  messageSnippet String   @map("message_snippet") @db.Text // 消息摘要（脱敏）
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sensitiveWord SensitiveWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([wordId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("sensitive_word_logs")
+}
+
+// ==================== 全局系统配置 ====================
+
+model SystemConfig {
+  key       String   @id @db.VarChar(191)
+  value     Json     @db.Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_configs")
 }

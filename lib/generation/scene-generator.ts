@@ -162,27 +162,17 @@ export async function generateSceneContent(
   | GeneratedPBLContent
   | null
 > {
-  // If outline is interactive but missing interactiveConfig, fall back to slide
-  if (outline.type === 'interactive' && !outline.interactiveConfig) {
-    log.warn(
-      `Interactive outline "${outline.title}" missing interactiveConfig, falling back to slide`,
-    );
-    const fallbackOutline = { ...outline, type: 'slide' as const };
-    return generateSlideContent(
-      fallbackOutline,
-      aiCall,
-      assignedImages,
-      imageMapping,
-      visionEnabled,
-      generatedMediaMapping,
-      agents,
-    );
-  }
+  log.info(`[generateSceneContent] Starting: "${outline.title}" (${outline.type})`);
 
-  switch (outline.type) {
-    case 'slide':
+  try {
+    // If outline is interactive but missing interactiveConfig, fall back to slide
+    if (outline.type === 'interactive' && !outline.interactiveConfig) {
+      log.warn(
+        `Interactive outline "${outline.title}" missing interactiveConfig, falling back to slide`,
+      );
+      const fallbackOutline = { ...outline, type: 'slide' as const };
       return generateSlideContent(
-        outline,
+        fallbackOutline,
         aiCall,
         assignedImages,
         imageMapping,
@@ -190,14 +180,38 @@ export async function generateSceneContent(
         generatedMediaMapping,
         agents,
       );
-    case 'quiz':
-      return generateQuizContent(outline, aiCall);
-    case 'interactive':
-      return generateInteractiveContent(outline, aiCall, outline.language);
-    case 'pbl':
-      return generatePBLSceneContent(outline, languageModel);
-    default:
-      return null;
+    }
+
+    switch (outline.type) {
+      case 'slide':
+        log.debug(`Generating slide content for: ${outline.title}`);
+        return await generateSlideContent(
+          outline,
+          aiCall,
+          assignedImages,
+          imageMapping,
+          visionEnabled,
+          generatedMediaMapping,
+          agents,
+        );
+      case 'quiz':
+        log.debug(`Generating quiz content for: ${outline.title}`);
+        return await generateQuizContent(outline, aiCall);
+      case 'interactive':
+        log.debug(`Generating interactive content for: ${outline.title}`);
+        return await generateInteractiveContent(outline, aiCall, outline.language);
+      case 'pbl':
+        log.debug(`Generating PBL content for: ${outline.title}`);
+        return await generatePBLSceneContent(outline, languageModel);
+      default:
+        log.error(`[generateSceneContent] Unknown scene type: ${outline.type} for "${outline.title}"`);
+        return null;
+    }
+  } catch (error) {
+    log.error(`[generateSceneContent] Exception in ${outline.type} generation for "${outline.title}":`, error);
+    log.error(`[generateSceneContent] Outline details:`, JSON.stringify(outline, null, 2));
+    // Re-throw to preserve stack trace and let the API handler catch it
+    throw error;
   }
 }
 
@@ -547,6 +561,8 @@ async function generateSlideContent(
   });
 
   if (!prompts) {
+    log.error(`[generateSlideContent] Failed to build prompt for: ${outline.title}`);
+    log.error(`[generateSlideContent] Outline:`, JSON.stringify(outline, null, 2));
     return null;
   }
 
@@ -559,10 +575,12 @@ async function generateSlideContent(
   }
 
   const response = await aiCall(prompts.system, prompts.user, visionImages);
+  log.debug(`LLM raw response for slide "${outline.title}" (first 500 chars): ${response.substring(0, 500)}`);
   const generatedData = parseJsonResponse<GeneratedSlideData>(response);
 
   if (!generatedData || !generatedData.elements || !Array.isArray(generatedData.elements)) {
-    log.error(`Failed to parse AI response for: ${outline.title}`);
+    log.error(`[generateSlideContent] Failed to parse AI response for slide: ${outline.title}`);
+    log.error(`[generateSlideContent] Full LLM response (${response.length} chars):\n${response.substring(0, 3000)}${response.length > 3000 ? '\n... [truncated]' : ''}`);
     return null;
   }
 
@@ -649,15 +667,19 @@ async function generateQuizContent(
   });
 
   if (!prompts) {
+    log.error(`[generateQuizContent] Failed to build prompt for quiz: ${outline.title}`);
+    log.error(`[generateQuizContent] Quiz config:`, JSON.stringify(outline.quizConfig, null, 2));
     return null;
   }
 
   log.debug(`Generating quiz content for: ${outline.title}`);
   const response = await aiCall(prompts.system, prompts.user);
+  log.debug(`LLM raw response for quiz "${outline.title}" (first 300 chars): ${response.substring(0, 300)}`);
   const generatedQuestions = parseJsonResponse<QuizQuestion[]>(response);
 
   if (!generatedQuestions || !Array.isArray(generatedQuestions)) {
-    log.error(`Failed to parse AI response for: ${outline.title}`);
+    log.error(`[generateQuizContent] Failed to parse AI response for quiz: ${outline.title}`);
+    log.error(`[generateQuizContent] Full LLM response (${response.length} chars):\n${response.substring(0, 2000)}${response.length > 2000 ? '\n... [truncated]' : ''}`);
     return null;
   }
 

@@ -38,6 +38,9 @@ function getTTSProviderName(providerId: TTSProviderId, t: (key: string) => strin
     'glm-tts': t('settings.providerGLMTTS'),
     'qwen-tts': t('settings.providerQwenTTS'),
     'elevenlabs-tts': t('settings.providerElevenLabsTTS'),
+    'minimax-tts': t('settings.providerMiniMaxTTS'),
+    'custom-minimax-tts': 'MOSS TTS Nano',
+    'doubao-tts': '火山豆包 TTS',
     'browser-native-tts': t('settings.providerBrowserNativeTTS'),
   };
   return names[providerId];
@@ -48,6 +51,7 @@ function getASRProviderName(providerId: ASRProviderId, t: (key: string) => strin
     'openai-whisper': t('settings.providerOpenAIWhisper'),
     'browser-native': t('settings.providerBrowserNative'),
     'qwen-asr': t('settings.providerQwenASR'),
+    'third-party-asr': t('settings.providerThirdPartyASR'),
   };
   return names[providerId];
 }
@@ -78,6 +82,7 @@ export function AudioSettings({ onSave }: AudioSettingsProps = {}) {
   const asrProviderId = useSettingsStore((state) => state.asrProviderId);
   const asrLanguage = useSettingsStore((state) => state.asrLanguage);
   const asrProvidersConfig = useSettingsStore((state) => state.asrProvidersConfig);
+  const useFrontendASRConfig = useSettingsStore((state) => state.useFrontendASRConfig);
   const setASRProvider = useSettingsStore((state) => state.setASRProvider);
   const setASRLanguage = useSettingsStore((state) => state.setASRLanguage);
   const setASRProviderConfig = useSettingsStore((state) => state.setASRProviderConfig);
@@ -328,6 +333,7 @@ export function AudioSettings({ onSave }: AudioSettingsProps = {}) {
             if (baseUrlValue && baseUrlValue.trim()) {
               formData.append('baseUrl', baseUrlValue);
             }
+            formData.append('useFrontendASRConfig', String(useFrontendASRConfig));
 
             try {
               const response = await fetch('/api/transcription', {
@@ -493,6 +499,12 @@ export function AudioSettings({ onSave }: AudioSettingsProps = {}) {
                   className="text-sm"
                 />
               </div>
+
+              {ttsProviderId === 'doubao-tts' && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-normal col-span-2">
+                  提示：火山豆包 V3 接口需要 X-Api-Key 与 X-Api-Resource-Id 参数。您可以填入：<code className="bg-slate-100 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">密钥;资源ID</code>。不填则默认使用官方公开测试密钥与 <code className="bg-slate-100 dark:bg-slate-900 px-1 py-0.5 rounded font-mono">seed-icl-2.0</code>。
+                </p>
+              )}
             </div>
           )}
         </div>
