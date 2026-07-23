@@ -939,7 +939,16 @@ export function Stage({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0 relative">
         {/* Header */}
-        {!isPresenting && <Header currentSceneTitle={currentScene?.title || ''} />}
+        {!isPresenting && (
+          <Header
+            currentSceneTitle={
+              currentScene?.title ||
+              (isPendingScene
+                ? generatingOutlines[0]?.title || '生成中...'
+                : '')
+            }
+          />
+        )}
 
         {/* Canvas Area */}
         <div

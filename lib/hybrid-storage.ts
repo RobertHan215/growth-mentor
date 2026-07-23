@@ -275,9 +275,12 @@ export async function getScenesByStageId(stageId: string): Promise<SceneRecord[]
 export async function createScene(record: SceneRecord): Promise<void> {
   await indexedDB.scenes.put(record);
 
-  syncToMySQL('scene', 'create', record).catch((err) => {
+  try {
+    // Await so saveStageData can't race delete/create and wipe rows.
+    await syncToMySQL('scene', 'create', record);
+  } catch (err) {
     console.warn('MySQL sync failed for scene:', err);
-  });
+  }
 }
 
 export async function updateScene(sceneId: string, updates: Partial<SceneRecord>): Promise<void> {
@@ -294,17 +297,21 @@ export async function updateScene(sceneId: string, updates: Partial<SceneRecord>
 export async function deleteScene(sceneId: string): Promise<void> {
   await indexedDB.scenes.delete(sceneId);
 
-  syncToMySQL('scene', 'delete', { id: sceneId }).catch((err) => {
+  try {
+    await syncToMySQL('scene', 'delete', { id: sceneId });
+  } catch (err) {
     console.warn('MySQL sync failed for scene delete:', err);
-  });
+  }
 }
 
 export async function deleteScenesByStageId(stageId: string): Promise<void> {
   await indexedDB.scenes.where('stageId').equals(stageId).delete();
 
-  syncToMySQL('scene', 'deleteByStage', { stageId }).catch((err) => {
+  try {
+    await syncToMySQL('scene', 'deleteByStage', { stageId });
+  } catch (err) {
     console.warn('MySQL sync failed for scenes delete:', err);
-  });
+  }
 }
 
 // ==================== Media 存储 ====================
@@ -399,9 +406,28 @@ export async function getAudioFile(id: string): Promise<AudioFileRecord | null> 
 export async function saveAudioFile(record: AudioFileRecord): Promise<void> {
   await indexedDB.audioFiles.put(record);
 
-  syncToMySQL('audio', 'save', record).catch((err) => {
-    console.warn('MySQL sync failed for audio:', err);
-  });
+  // Blob can't JSON.stringify — send base64 for MySQL sync.
+  void (async () => {
+    try {
+      const buf = await record.blob.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+      await syncToMySQL('audio', 'save', {
+        id: record.id,
+        format: record.format,
+        duration: record.duration,
+        text: record.text,
+        voice: record.voice,
+        ossKey: record.ossKey,
+        createdAt: record.createdAt,
+        blobBase64: base64,
+      });
+    } catch (err) {
+      console.warn('MySQL sync failed for audio:', err);
+    }
+  })();
 }
 
 export async function deleteAudioFile(id: string): Promise<void> {

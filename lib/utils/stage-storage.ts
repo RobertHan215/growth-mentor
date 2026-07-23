@@ -10,11 +10,10 @@ import {
   listStages as hybridListStages,
   getStage as hybridGetStage,
   createStage as hybridCreateStage,
-  updateStage as hybridUpdateStage,
   deleteStageWithRelatedData as hybridDeleteStage,
   getScenesByStageId as hybridGetScenes,
   createScene as hybridCreateScene,
-  deleteScenesByStageId as hybridDeleteScenes,
+  deleteScene as hybridDeleteScene,
   getFirstSlideByStages as hybridGetFirstSlide,
   getStageOutlines as hybridGetOutlines,
   saveStageOutlines as hybridSaveOutlines,
@@ -71,16 +70,22 @@ export async function saveStageData(
       updatedAt: now,
       language: data.stage.language,
       style: data.stage.style,
-      currentSceneId: data.currentSceneId || undefined,
+      // Never persist the transient pending placeholder as the current scene.
+      currentSceneId:
+        data.currentSceneId && data.currentSceneId !== '__pending__'
+          ? data.currentSceneId
+          : data.scenes?.[0]?.id || existingStage?.currentSceneId || undefined,
       agentIds: data.stage.agentIds,
       learningMode: data.stage.learningMode,
     });
 
-    await hybridDeleteScenes(stageId);
-
+    // Upsert scenes in place. Do NOT delete-all first — that leaves IndexedDB empty
+    // mid-save and loadFromStorage can wipe in-memory scenes (blank classroom).
+    const keepIds = new Set<string>();
     if (data.scenes && data.scenes.length > 0) {
       for (let index = 0; index < data.scenes.length; index++) {
         const scene = data.scenes[index];
+        keepIds.add(scene.id);
         await hybridCreateScene({
           ...scene,
           stageId,
@@ -88,6 +93,17 @@ export async function saveStageData(
           createdAt: scene.createdAt || now,
           updatedAt: scene.updatedAt || now,
         });
+      }
+    }
+
+    // Drop scenes removed from the stage (only when we have a non-empty keep set,
+    // so an early empty save for a brand-new stage doesn't thrash).
+    if (keepIds.size > 0) {
+      const localScenes = await hybridGetScenes(stageId);
+      for (const local of localScenes) {
+        if (!keepIds.has(local.id)) {
+          await hybridDeleteScene(local.id);
+        }
       }
     }
 

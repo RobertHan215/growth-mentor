@@ -644,16 +644,44 @@ export async function getAudioFile(id: string): Promise<AudioFileRecord | null> 
   };
 }
 
-export async function saveAudioFile(record: AudioFileRecord): Promise<void> {
-  await prisma.audioFile.create({
-    data: {
-      id: record.id,
-      blob: record.blob as any,
-      duration: record.duration || null,
-      format: record.format,
-      text: record.text || null,
-      voice: record.voice || null,
-      ossKey: record.ossKey || null,
+export async function saveAudioFile(
+  record: AudioFileRecord & { blobBase64?: string },
+): Promise<void> {
+  let blobData: Buffer;
+  const raw = record as AudioFileRecord & { blobBase64?: string; blob?: unknown };
+
+  if (typeof raw.blobBase64 === 'string' && raw.blobBase64) {
+    blobData = Buffer.from(raw.blobBase64, 'base64');
+  } else if (Buffer.isBuffer(raw.blob)) {
+    blobData = raw.blob;
+  } else if (raw.blob && typeof raw.blob === 'object' && ArrayBuffer.isView(raw.blob as ArrayBufferView)) {
+    blobData = Buffer.from(raw.blob as Uint8Array);
+  } else if (raw.blob && typeof raw.blob === 'object' && (raw.blob as ArrayBuffer).byteLength !== undefined) {
+    blobData = Buffer.from(new Uint8Array(raw.blob as ArrayBuffer));
+  } else {
+    throw new Error('Audio blob missing (expected blobBase64 or Buffer)');
+  }
+
+  const data = {
+    id: record.id,
+    blob: new Uint8Array(blobData),
+    duration: record.duration || null,
+    format: record.format,
+    text: record.text || null,
+    voice: record.voice || null,
+    ossKey: record.ossKey || null,
+  };
+
+  await prisma.audioFile.upsert({
+    where: { id: data.id },
+    create: data,
+    update: {
+      blob: data.blob,
+      duration: data.duration,
+      format: data.format,
+      text: data.text,
+      voice: data.voice,
+      ossKey: data.ossKey,
     },
   });
 }
