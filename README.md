@@ -89,5 +89,6 @@ docker compose up --build
 | `pnpm dev` | 开发服务器 |
 | `pnpm dev:local` | 拉起本地 MySQL 并启动 dev |
 | `pnpm db:up` / `pnpm db:down` | 启停本地 MySQL |
+| `pnpm db:dump` / `pnpm db:import <sql>` | 导出/导入本地库（换机、移交评委） |
 | `pnpm build` / `pnpm start` | 生产构建与运行 |
 | `pnpm test` | 单元测试 |

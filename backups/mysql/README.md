@@ -1,28 +1,45 @@
 # MySQL dumps（本地离线）
 
-- `university-latest.sql` — 远端 `university` 库全量备份（最新）
-- `university-YYYYMMDD.sql` — 带日期的快照
+本地库：`growth_mentor_local` @ `127.0.0.1:3307`（Docker Compose `mysql` 服务）
 
-## 已迁入本地的数据（导入后）
+| 文件 | 说明 |
+|------|------|
+| `growth-mentor-latest.sql` | 本地库最新全量备份（推荐移交这个） |
+| `growth-mentor-YYYYMMDD-HHMMSS.sql` | 带时间戳的快照 |
 
-本地库：`growth_mentor_local` @ `127.0.0.1:3307`
+> **安全：** `*.sql` 含用户哈希 / 业务数据，已在 `.gitignore` 忽略，**不要**强制 add 进 git。  
+> 交给评委时用 U 盘 / 压缩包单独带 dump 文件。
 
-典型表行数（导入当时）：users / stages / scenes / 角色模板等均已包含。
-
-## 导入
+## 导出当前本地数据（换机 / 移交前必做）
 
 ```bash
 pnpm db:up
-./scripts/db-import-local.sh backups/mysql/university-latest.sql
+pnpm db:dump
+# -> backups/mysql/growth-mentor-<时间戳>.sql
+# -> 同时更新 backups/mysql/growth-mentor-latest.sql
 ```
 
-## 重新从远端导出
+## 新电脑 / 评委机恢复
 
-`.env.local` 中配置 `REMOTE_DATABASE_URL` 后：
+前置：Node ≥ 20、pnpm、Docker。
 
 ```bash
-./scripts/db-dump-remote.sh backups/mysql/university-latest.sql
+# 1. 拿到代码 + dump 文件
+git clone <repo> && cd growth-mentor
+# 把 growth-mentor-latest.sql 放到 backups/mysql/
+
+# 2. 环境
+cp .env.example .env.local
+# 按需填 API Key；DATABASE_URL 默认已是本地 Docker
+
+# 3. 依赖 + 库
+pnpm install
+pnpm db:up
+pnpm db:import backups/mysql/growth-mentor-latest.sql
+
+# 4. 启动
+pnpm dev:local
+# 浏览器 http://localhost:3000
 ```
 
-> **安全：** `*.sql` 可能含 API Key / 用户哈希，已在 `.gitignore` 中忽略，**不要**强制 add 进 git。
-> 文件仍在本机 `backups/mysql/`，用 import 脚本即可恢复。
+默认账号（以 dump 里实际用户为准）：`admin` / `jason` / `robert`。

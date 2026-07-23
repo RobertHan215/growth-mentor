@@ -11,7 +11,7 @@
     "dev": "next dev",
     "db:up": "docker compose up -d mysql",
     "db:down": "docker compose stop mysql",
-    "db:dump": "./scripts/db-dump-remote.sh",
+    "db:dump": "./scripts/db-dump-local.sh",
     "db:import": "./scripts/db-import-local.sh",
     "dev:local": "docker compose up -d mysql && next dev",
     "build": "next build",
