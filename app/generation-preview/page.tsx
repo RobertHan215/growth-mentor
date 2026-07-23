@@ -375,15 +375,23 @@ function GenerationPreviewContent() {
 
       // Create stage client-side (needed for agent generation stageId)
       const stageId = nanoid(10);
+      const requirementText = currentSession.requirements.requirement.trim();
       const stage: Stage = {
         id: stageId,
-        name: extractTopicFromRequirement(currentSession.requirements.requirement),
-        description: '',
+        // Short title only — stages.name is VARCHAR(191)
+        name: extractTopicFromRequirement(requirementText),
+        // Keep full prompt in description for later generation context
+        description: requirementText,
         language: currentSession.requirements.language || 'zh-CN',
         style: 'professional',
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+
+      // Persist stage to MySQL before agents/scenes (FK on stage_id).
+      const storeEarly = useStageStore.getState();
+      storeEarly.setStage(stage);
+      await storeEarly.saveToStorage();
 
       if (settings.agentMode === 'auto') {
         const agentStepIdx = activeSteps.findIndex((s) => s.id === 'agent-generation');
@@ -837,10 +845,16 @@ function GenerationPreviewContent() {
 
   const extractTopicFromRequirement = (requirement: string): string => {
     const trimmed = requirement.trim();
-    if (trimmed.length <= 500) {
-      return trimmed;
-    }
-    return trimmed.substring(0, 500).trim() + '...';
+    // Prefer first markdown heading, else first meaningful line. Cap for VARCHAR(191).
+    const heading = trimmed.match(/^#{1,6}\s+(.+)$/m)?.[1]?.trim();
+    const firstLine =
+      heading ||
+      trimmed
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l && !l.startsWith('>') && l !== '---') ||
+      trimmed;
+    return firstLine.slice(0, 100);
   };
 
   const goBackToHome = () => {

@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error('Scene API error:', error);
-    return NextResponse.json({ error: 'Failed to process scene' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to process scene';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

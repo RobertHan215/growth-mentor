@@ -60,31 +60,21 @@ export async function saveStageData(
 
     const existingStage = await hybridGetStage(stageId);
 
-    if (existingStage) {
-      await hybridUpdateStage(stageId, {
-        name: data.stage.name || 'Untitled Stage',
-        description: data.stage.description,
-        language: data.stage.language,
-        style: data.stage.style,
-        currentSceneId: data.currentSceneId || undefined,
-        agentIds: data.stage.agentIds,
-        learningMode: data.stage.learningMode,
-      });
-    } else {
-      await hybridCreateStage({
-        id: stageId,
-        userId,
-        name: data.stage.name || 'Untitled Stage',
-        description: data.stage.description,
-        createdAt: data.stage.createdAt || now,
-        updatedAt: now,
-        language: data.stage.language,
-        style: data.stage.style,
-        currentSceneId: data.currentSceneId || undefined,
-        agentIds: data.stage.agentIds,
-        learningMode: data.stage.learningMode,
-      });
-    }
+    // Always upsert full stage (server create is upsert + awaited). Avoids the
+    // IndexedDB-hit → MySQL update-miss path after a prior failed create.
+    await hybridCreateStage({
+      id: stageId,
+      userId,
+      name: data.stage.name || 'Untitled Stage',
+      description: data.stage.description,
+      createdAt: data.stage.createdAt || existingStage?.createdAt || now,
+      updatedAt: now,
+      language: data.stage.language,
+      style: data.stage.style,
+      currentSceneId: data.currentSceneId || undefined,
+      agentIds: data.stage.agentIds,
+      learningMode: data.stage.learningMode,
+    });
 
     await hybridDeleteScenes(stageId);
 

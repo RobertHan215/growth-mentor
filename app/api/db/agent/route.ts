@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     apiLog('agent', 'POST', url, null, 500, Date.now() - start);
     console.error('Agent API error:', error);
-    return NextResponse.json({ error: 'Failed to process agent' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to process agent';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

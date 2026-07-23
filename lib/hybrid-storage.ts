@@ -202,11 +202,14 @@ export async function createStage(record: StageRecord): Promise<void> {
     agentIds: record.agentIds,
   });
 
-  // 只有在有有效 userId 时才同步到 MySQL (避免外键约束失败)
+  // Await MySQL create so agents/scenes don't race ahead of the stage row (FK).
   if (record.userId && record.userId !== 'anonymous') {
-    syncToMySQL('stage', 'create', record).catch((err) => {
+    try {
+      await syncToMySQL('stage', 'create', record);
+    } catch (err) {
       console.warn('MySQL sync failed for stage:', err);
-    });
+      throw err;
+    }
   }
 }
 
@@ -217,10 +220,14 @@ export async function updateStage(stageId: string, updates: Partial<StageRecord>
     updatedAt: Date.now(),
   });
 
-  // 异步同步到 MySQL
-  syncToMySQL('stage', 'update', { id: stageId, ...updates }).catch((err) => {
-    console.warn('MySQL sync failed for stage update:', err);
-  });
+  // Include userId when available so server can recreate a missing MySQL row.
+  const local = await indexedDB.stages.get(stageId);
+  const userId = updates.userId || (local as any)?.userId;
+  syncToMySQL('stage', 'update', { id: stageId, ...(userId ? { userId } : {}), ...updates }).catch(
+    (err) => {
+      console.warn('MySQL sync failed for stage update:', err);
+    },
+  );
 }
 
 export async function deleteStage(stageId: string): Promise<void> {
@@ -646,9 +653,17 @@ async function syncToMySQL(entity: string, action: string, data: any): Promise<v
       body: JSON.stringify({ action, data }),
     });
 
-    const result = await res.json();
-    if (!result.success) {
-      throw new Error(result.error);
+    const text = await res.text();
+    let result: { success?: boolean; error?: string } = {};
+    if (text) {
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(text.slice(0, 200) || `Invalid JSON (${res.status})`);
+      }
+    }
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || `HTTP ${res.status}`);
     }
 
     // 更新同步状态

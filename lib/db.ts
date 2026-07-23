@@ -206,11 +206,19 @@ function stageFromDB(record: {
   };
 }
 
+// MySQL String defaults to VARCHAR(191); keep names/titles inside the column limit.
+const DB_VARCHAR_LIMIT = 191;
+
+function clipVarchar(value: string | null | undefined, limit = DB_VARCHAR_LIMIT): string | null {
+  if (value == null) return null;
+  return value.length > limit ? value.slice(0, limit) : value;
+}
+
 function stageToDB(record: Partial<StageRecord> & { id: string; userId: string; name: string }) {
   return {
     id: record.id,
     userId: record.userId,
-    name: record.name,
+    name: clipVarchar(record.name) || 'Untitled',
     description: record.description || null,
     language: record.language || null,
     style: record.style || null,
@@ -253,7 +261,7 @@ function sceneToDB(record: SceneRecord) {
     id: record.id,
     stageId: record.stageId,
     type: record.type,
-    title: record.title,
+    title: clipVarchar(record.title) || 'Untitled',
     order: record.order,
     content: record.content,
     actions: record.actions || null,
@@ -279,25 +287,47 @@ export async function getStage(stageId: string): Promise<StageRecord | null> {
 }
 
 export async function createStage(record: StageRecord): Promise<void> {
-  await prisma.stage.create({
-    data: stageToDB(record),
+  const dbData = stageToDB(record);
+  // Upsert: generation may retry after a partial local-only save.
+  await prisma.stage.upsert({
+    where: { id: dbData.id },
+    create: dbData as any,
+    update: {
+      name: dbData.name,
+      description: dbData.description,
+      language: dbData.language,
+      style: dbData.style,
+      currentSceneId: dbData.currentSceneId,
+      agentIds: dbData.agentIds,
+      learningMode: dbData.learningMode,
+      oneOnOneTagId: dbData.oneOnOneTagId,
+      characterTemplateIds: dbData.characterTemplateIds,
+    },
   });
 }
 
 export async function updateStage(
   stageId: string,
-  data: Partial<Omit<StageRecord, 'id' | 'userId' | 'createdAt'>> & { directorConfig?: Record<string, unknown> },
+  data: Partial<Omit<StageRecord, 'id' | 'userId' | 'createdAt'>> & {
+    directorConfig?: Record<string, unknown>;
+    userId?: string;
+  },
 ): Promise<void> {
   const updateData: Record<string, unknown> = {
-    name: data.name,
-    description: data.description || null,
-    language: data.language || null,
-    style: data.style || null,
-    currentSceneId: data.currentSceneId || null,
-    agentIds: data.agentIds ? JSON.stringify(data.agentIds) : null,
+    name: data.name !== undefined ? clipVarchar(data.name) || 'Untitled' : undefined,
+    description: data.description !== undefined ? data.description || null : undefined,
+    language: data.language !== undefined ? data.language || null : undefined,
+    style: data.style !== undefined ? data.style || null : undefined,
+    currentSceneId: data.currentSceneId !== undefined ? data.currentSceneId || null : undefined,
+    agentIds: data.agentIds !== undefined ? (data.agentIds ? JSON.stringify(data.agentIds) : null) : undefined,
     learningMode: data.learningMode,
-    oneOnOneTagId: data.oneOnOneTagId || null,
-    characterTemplateIds: data.characterTemplateIds ? JSON.stringify(data.characterTemplateIds) : null,
+    oneOnOneTagId: data.oneOnOneTagId !== undefined ? data.oneOnOneTagId || null : undefined,
+    characterTemplateIds:
+      data.characterTemplateIds !== undefined
+        ? data.characterTemplateIds
+          ? JSON.stringify(data.characterTemplateIds)
+          : null
+        : undefined,
   };
 
   // Deep-merge directorConfig: read existing value, then spread new fields on top
@@ -315,10 +345,40 @@ export async function updateStage(
     if (updateData[key] === undefined) delete updateData[key];
   }
 
-  await prisma.stage.update({
-    where: { id: stageId },
-    data: updateData as Parameters<typeof prisma.stage.update>[0]['data'],
-  });
+  try {
+    await prisma.stage.update({
+      where: { id: stageId },
+      data: updateData as Parameters<typeof prisma.stage.update>[0]['data'],
+    });
+  } catch (error: any) {
+    // Local IndexedDB may already have the stage while MySQL create previously failed.
+    // Recover by creating when the caller still has a userId.
+    if (error?.code === 'P2025' && data.userId) {
+      await createStage({
+        id: stageId,
+        userId: data.userId,
+        name: (data.name as string) || 'Untitled',
+        description: data.description,
+        language: data.language,
+        style: data.style,
+        currentSceneId: data.currentSceneId,
+        agentIds: data.agentIds,
+        learningMode: data.learningMode,
+        oneOnOneTagId: data.oneOnOneTagId,
+        characterTemplateIds: data.characterTemplateIds,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      if (data.directorConfig) {
+        await prisma.stage.update({
+          where: { id: stageId },
+          data: { directorConfig: data.directorConfig } as any,
+        });
+      }
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function deleteStage(stageId: string): Promise<void> {
@@ -777,16 +837,27 @@ export async function getGeneratedAgentsByStageId(
 }
 
 export async function saveGeneratedAgent(record: GeneratedAgentRecord): Promise<void> {
-  await prisma.generatedAgent.create({
-    data: {
-      id: record.id,
-      stageId: record.stageId,
-      name: record.name,
-      role: record.role,
-      persona: record.persona,
-      avatar: record.avatar,
-      color: record.color,
-      priority: record.priority,
+  const data = {
+    id: record.id,
+    stageId: record.stageId,
+    name: clipVarchar(record.name) || 'Agent',
+    role: record.role,
+    persona: record.persona,
+    avatar: record.avatar,
+    color: record.color,
+    priority: record.priority,
+  };
+  await prisma.generatedAgent.upsert({
+    where: { id: data.id },
+    create: data,
+    update: {
+      stageId: data.stageId,
+      name: data.name,
+      role: data.role,
+      persona: data.persona,
+      avatar: data.avatar,
+      color: data.color,
+      priority: data.priority,
     },
   });
 }

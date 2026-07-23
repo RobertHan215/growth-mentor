@@ -285,6 +285,7 @@ const useStageStoreBase = create<StageState>()((set, get) => ({
       );
     } catch (error) {
       log.error('Failed to save to storage:', error);
+      throw error;
     }
   },
 
