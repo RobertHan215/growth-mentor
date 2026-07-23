@@ -17,11 +17,14 @@ import type { ScoringResultSnapshot } from '@/lib/types/one-on-one-scoring';
 interface CourseTrainingSummary {
   stageId: string;
   stageName: string;
+  learningMode: 'teaching' | 'oneOnOne';
   totalAttempts: number;
-  bestScore: number;
-  latestScore: number;
+  bestScore: number | null;
+  latestScore: number | null;
   lastTrainedAt: string;
-  avgScore: number;
+  avgScore: number | null;
+  status: string | null;
+  hasSummary: boolean;
 }
 
 interface TrainingResultDetail {
@@ -76,7 +79,15 @@ export default function MyTrainingPage() {
         const res = await fetch('/api/training/my-summary');
         if (res.ok) {
           const data = await res.json();
-          setCourses(data.courses || []);
+          setCourses((data.courses || []).map((c: CourseTrainingSummary) => ({
+            ...c,
+            learningMode: c.learningMode === 'teaching' ? 'teaching' : 'oneOnOne',
+            bestScore: c.bestScore ?? null,
+            latestScore: c.latestScore ?? null,
+            avgScore: c.avgScore ?? null,
+            status: c.status ?? null,
+            hasSummary: Boolean(c.hasSummary),
+          })));
         }
       } catch (err) {
         console.error('Failed to load training summary:', err);
@@ -106,12 +117,19 @@ export default function MyTrainingPage() {
     setDetailLoading(null);
   };
 
-  const handleToggleCourse = (stageId: string) => {
-    if (expandedCourseId === stageId) {
+  const courseKey = (course: CourseTrainingSummary) =>
+    `${course.stageId}:${course.learningMode}`;
+
+  const handleToggleCourse = (course: CourseTrainingSummary) => {
+    const key = courseKey(course);
+    if (expandedCourseId === key) {
       setExpandedCourseId(null);
-    } else {
-      setExpandedCourseId(stageId);
-      loadCourseDetails(stageId);
+      return;
+    }
+    setExpandedCourseId(key);
+    // 教学模式无一对一评分历史，直接进课堂即可
+    if (course.learningMode === 'oneOnOne') {
+      loadCourseDetails(course.stageId);
     }
   };
 
@@ -177,7 +195,7 @@ export default function MyTrainingPage() {
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <Target className="w-16 h-16 opacity-20 mb-4" />
             <h2 className="text-lg font-semibold text-gray-600 dark:text-gray-300 mb-2">暂无训练记录</h2>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">进入课堂选择一对一模式开始你的第一次对练吧！</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">进入课堂开始教学模式学习，或选择一对一模式开始对练吧！</p>
             <button
               onClick={() => router.push('/')}
               className="px-6 py-2.5 bg-red-500 text-white text-sm font-semibold rounded-xl hover:bg-red-600 transition-colors shadow-sm"
@@ -209,7 +227,7 @@ export default function MyTrainingPage() {
                 <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
                   {courses.length}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">已练课程</div>
+                <div className="text-xs text-gray-500 mt-1">已学课程</div>
               </motion.div>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -218,16 +236,23 @@ export default function MyTrainingPage() {
                 className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/60 dark:border-gray-800 p-6 text-center shadow-sm"
               >
                 <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {Math.max(...courses.map((c) => c.bestScore), 0)}
+                  {Math.max(0, ...courses.filter((c) => c.bestScore != null).map((c) => c.bestScore as number))}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">最高分</div>
               </motion.div>
             </div>
 
             {/* Course cards */}
-            {courses.map((course, i) => (
+            {courses.map((course, i) => {
+              const key = courseKey(course);
+              const isTeaching = course.learningMode === 'teaching';
+              const isExpanded = expandedCourseId === key;
+              const statusLabel =
+                course.status === 'completed' ? '已结课' : course.status === 'dropped' ? '已退出' : '学习中';
+
+              return (
               <motion.div
-                key={course.stageId}
+                key={key}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.05 }}
@@ -235,38 +260,73 @@ export default function MyTrainingPage() {
               >
                 {/* Card header — clickable */}
                 <button
-                  onClick={() => handleToggleCourse(course.stageId)}
+                  onClick={() => handleToggleCourse(course)}
                   className="w-full flex items-center gap-4 px-6 py-5 text-left hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-md shrink-0">
+                  <div className={cn(
+                    'w-12 h-12 rounded-xl flex items-center justify-center shadow-md shrink-0',
+                    isTeaching
+                      ? 'bg-gradient-to-br from-sky-500 to-sky-600'
+                      : 'bg-gradient-to-br from-red-500 to-red-600',
+                  )}>
                     <BookOpen className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-800 dark:text-white truncate">{course.stageName}</h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="text-base font-bold text-gray-800 dark:text-white truncate">{course.stageName}</h3>
+                      <span className={cn(
+                        'shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded',
+                        isTeaching
+                          ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                      )}>
+                        {isTeaching ? '教学模式' : '一对一对练'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {course.totalAttempts}次练习</span>
+                      {isTeaching ? (
+                        <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {statusLabel}</span>
+                      ) : (
+                        <span className="flex items-center gap-1"><Trophy className="w-3 h-3" /> {course.totalAttempts}次练习</span>
+                      )}
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(course.lastTrainedAt)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
-                    <div className="text-center">
-                      <div className={cn('text-xl font-bold', scoreColor(course.bestScore))}>{course.bestScore}</div>
-                      <div className="text-[10px] text-gray-400">最高</div>
-                    </div>
-                    <div className="text-center">
-                      <div className={cn('text-xl font-bold', scoreColor(course.latestScore))}>{course.latestScore}</div>
-                      <div className="text-[10px] text-gray-400">最近</div>
-                    </div>
+                    {isTeaching ? (
+                      <div className="text-center">
+                        <div className={cn(
+                          'text-sm font-bold',
+                          course.status === 'completed'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-sky-600 dark:text-sky-400',
+                        )}>
+                          {statusLabel}
+                        </div>
+                        <div className="text-[10px] text-gray-400">状态</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-center">
+                          <div className={cn('text-xl font-bold', scoreColor(course.bestScore ?? 0))}>{course.bestScore}</div>
+                          <div className="text-[10px] text-gray-400">最高</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={cn('text-xl font-bold', scoreColor(course.latestScore ?? 0))}>{course.latestScore}</div>
+                          <div className="text-[10px] text-gray-400">最近</div>
+                        </div>
+                      </>
+                    )}
                     <ChevronRight className={cn(
                       'w-5 h-5 text-gray-300 transition-transform duration-200',
-                      expandedCourseId === course.stageId && 'rotate-90',
+                      isExpanded && 'rotate-90',
                     )} />
                   </div>
                 </button>
 
                 {/* Expanded details */}
                 <AnimatePresence>
-                  {expandedCourseId === course.stageId && (
+                  {isExpanded && (
                     <motion.div
                       initial={{ height: 0 }}
                       animate={{ height: 'auto' }}
@@ -275,7 +335,24 @@ export default function MyTrainingPage() {
                       className="overflow-hidden"
                     >
                       <div className="px-6 pb-6 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-5">
-                        {detailLoading === course.stageId ? (
+                        {isTeaching ? (
+                          <div className="space-y-4">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {course.status === 'completed'
+                                ? '你已完成该课程的教学模式学习。'
+                                : '你正在通过教学模式学习这门课程，可继续进入课堂。'}
+                              {course.hasSummary ? ' 已生成结课总结。' : ''}
+                            </p>
+                            <div className="text-center pt-2">
+                              <button
+                                onClick={() => router.push(`/classroom/${course.stageId}`)}
+                                className="px-5 py-2 bg-sky-500 text-white text-xs font-semibold rounded-lg hover:bg-sky-600 transition-colors shadow-sm"
+                              >
+                                {course.status === 'completed' ? '再次学习' : '继续学习'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : detailLoading === course.stageId ? (
                           <div className="flex items-center justify-center py-8 gap-2 text-gray-400">
                             <Loader2 className="w-5 h-5 animate-spin" />
                             <span className="text-sm">加载中...</span>
@@ -375,7 +452,8 @@ export default function MyTrainingPage() {
                   )}
                 </AnimatePresence>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
