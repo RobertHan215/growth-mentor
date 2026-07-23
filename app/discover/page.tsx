@@ -3,11 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Compass, BookOpenCheck, Swords } from 'lucide-react';
-import { APP_NAME, APP_LOGO } from '@/lib/branding';
-import { getFirstSlideByStages } from '@/lib/utils/stage-storage';
-import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
+import { APP_NAME, APP_LOGO, DEFAULT_COURSE_COVER } from '@/lib/branding';
 import { deriveLearningMode } from '@/lib/training/course-learning-mode';
-import type { Slide } from '@/lib/types/slides';
 
 interface Course {
   id: string;
@@ -25,7 +22,6 @@ interface Course {
 export default function DiscoverPage() {
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [thumbnails, setThumbnails] = useState<Record<string, Slide>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modeFilter, setModeFilter] = useState<'all' | 'teaching' | 'oneOnOne'>('all');
@@ -47,7 +43,6 @@ export default function DiscoverPage() {
         if (Array.isArray(list)) {
           setCourses(list);
           setTotalPages(data.pagination?.totalPages || 1);
-          getFirstSlideByStages(list.map((c: Course) => c.id)).then(setThumbnails);
         }
       })
       .catch(console.error)
@@ -179,25 +174,15 @@ export default function DiscoverPage() {
                 >
                   {/* Thumbnail */}
                   <div className="aspect-[16/10] bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative overflow-hidden">
-                    {course.coverImage ? (
-                      <img
-                        src={course.coverImage}
-                        alt={course.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ) : thumbnails[course.id] ? (
-                      <ThumbnailSlide
-                        slide={thumbnails[course.id]}
-                        size={280}
-                        viewportSize={thumbnails[course.id].viewportSize ?? 1000}
-                        viewportRatio={thumbnails[course.id].viewportRatio ?? 0.5625}
-                      />
-                    ) : (
-                      <BookOpen className="w-12 h-12 text-slate-300 dark:text-slate-700 group-hover:scale-110 transition-transform duration-500" />
-                    )}
+                    <img
+                      src={course.coverImage || DEFAULT_COURSE_COVER}
+                      alt={course.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (!img.src.endsWith('/course-cover-default.jpg')) img.src = DEFAULT_COURSE_COVER;
+                      }}
+                    />
 
                     {/* Top-left overlay: category + mode badge */}
                     <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">

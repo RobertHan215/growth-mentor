@@ -41,6 +41,9 @@ export function asset(path: string): string {
 /** Logo image path (relative to /public), already basePath-aware */
 export const APP_LOGO = asset(process.env.NEXT_PUBLIC_APP_LOGO || '/logo-horizontal.png');
 
+/** Default course cover when a course has no coverImage set */
+export const DEFAULT_COURSE_COVER = asset('/course-cover-default.jpg');
+
 /**
  * Client-only: make bare fetch('/api/...') and fetch('/avatars/...') honor basePath.
  * Must run before any client fetch — import this module from a root client provider.

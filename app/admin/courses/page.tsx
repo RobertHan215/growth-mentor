@@ -13,7 +13,6 @@ import {
   Users,
   Shield,
   ChevronDown,
-  Image,
   Grid,
   List,
   Search,
@@ -27,11 +26,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { getFirstSlideByStages } from '@/lib/utils/stage-storage';
-import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
-import type { Slide } from '@/lib/types/slides';
 import { deriveLearningMode } from '@/lib/training/course-learning-mode';
 import { ScoringConfigPreviewDialog } from '@/components/admin/scoring-config-preview-dialog';
+import { DEFAULT_COURSE_COVER } from '@/lib/branding';
 
 interface Tag {
   id: string;
@@ -366,7 +363,6 @@ export default function CoursesPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [allUsers, setAllUsers] = useState<SimpleUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [thumbnails, setThumbnails] = useState<Record<string, Slide>>({});
   const [scoringTagSavingId, setScoringTagSavingId] = useState<string | null>(null);
 
   // Layout mode: grid or list
@@ -451,13 +447,6 @@ export default function CoursesPage() {
           .catch(() => ({ data: [] })),
       ]);
       setCourses(Array.isArray(cr) ? cr : []);
-      // Load slide thumbnails for courses without coverImage
-      const idsWithoutCover = (cr as Course[]).filter((c) => !c.coverImage).map((c) => c.id);
-      if (idsWithoutCover.length > 0) {
-        getFirstSlideByStages(idsWithoutCover)
-          .then(setThumbnails)
-          .catch(() => {});
-      }
       setCategories(Array.isArray(cat) ? cat : []);
       setTags(Array.isArray(tr) ? tr : []);
       setAllUsers(Array.isArray(ur?.data) ? ur.data : Array.isArray(ur) ? ur : []);
@@ -758,19 +747,6 @@ export default function CoursesPage() {
   const oneOnOneCount = courses.filter((c) => deriveLearningMode(c) === 'oneOnOne').length;
   const teachingCount = courses.filter((c) => deriveLearningMode(c) === 'teaching').length;
 
-  const getPlaceholderStyle = (name: string) => {
-    const charCode = name.charCodeAt(0) || 0;
-    const gradients = [
-      'from-indigo-500 to-purple-500',
-      'from-emerald-500 to-teal-500',
-      'from-amber-500 to-orange-500',
-      'from-rose-500 to-pink-500',
-      'from-blue-500 to-indigo-600',
-      'from-purple-500 to-pink-500',
-    ];
-    return gradients[charCode % gradients.length];
-  };
-
   return (
     <div className="space-y-6 pb-12">
       {/* 标题 */}
@@ -908,27 +884,11 @@ export default function CoursesPage() {
               >
                 {/* 封面区域 */}
                 <div className="relative h-40 overflow-hidden bg-slate-100 dark:bg-slate-850 shrink-0">
-                  {course.coverImage ? (
-                    <img
-                      src={course.coverImage}
-                      alt={course.name}
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
-                    />
-                  ) : thumbnails[course.id] ? (
-                    <div className="w-full h-full group-hover:scale-[1.03] transition-transform duration-300 overflow-hidden">
-                      <ThumbnailSlide
-                        slide={thumbnails[course.id]}
-                        size={320}
-                        viewportSize={thumbnails[course.id].viewportSize ?? 1000}
-                        viewportRatio={thumbnails[course.id].viewportRatio ?? 0.5625}
-                      />
-                    </div>
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-tr ${getPlaceholderStyle(course.name)} flex flex-col justify-between p-4 text-white group-hover:scale-[1.03] transition-transform duration-300`}>
-                      <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Course</span>
-                      <span className="text-2xl font-black truncate">{course.name.slice(0, 1) || 'C'}</span>
-                    </div>
-                  )}
+                  <img
+                    src={course.coverImage || DEFAULT_COURSE_COVER}
+                    alt={course.name}
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                  />
 
                   {/* 悬浮操作条 */}
                   <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 backdrop-blur-[2px]">
@@ -1085,24 +1045,11 @@ export default function CoursesPage() {
                 <div className="flex items-center gap-4 min-w-0">
                   {/* 缩略图 */}
                   <div className="w-16 h-12 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-850 shrink-0 border border-slate-100 dark:border-slate-800 relative">
-                    {course.coverImage ? (
-                      <img
-                        src={course.coverImage}
-                        alt={course.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : thumbnails[course.id] ? (
-                      <ThumbnailSlide
-                        slide={thumbnails[course.id]}
-                        size={64}
-                        viewportSize={thumbnails[course.id].viewportSize ?? 1000}
-                        viewportRatio={thumbnails[course.id].viewportRatio ?? 0.5625}
-                      />
-                    ) : (
-                      <div className={`w-full h-full bg-gradient-to-tr ${getPlaceholderStyle(course.name)} flex items-center justify-center text-white text-xs font-black uppercase`}>
-                        {course.name.slice(0, 1) || 'C'}
-                      </div>
-                    )}
+                    <img
+                      src={course.coverImage || DEFAULT_COURSE_COVER}
+                      alt={course.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
 
                   {/* 详情 */}
@@ -1279,11 +1226,11 @@ export default function CoursesPage() {
                   <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">课程封面</label>
                   <div className="flex gap-4 items-center">
                     <div className="w-24 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center shrink-0">
-                      {draftCoverImage ? (
-                        <img src={draftCoverImage} alt="封面预览" className="w-full h-full object-cover" />
-                      ) : (
-                        <Image className="size-6 text-slate-300" />
-                      )}
+                      <img
+                        src={draftCoverImage || DEFAULT_COURSE_COVER}
+                        alt="封面预览"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="flex-1 space-y-2">
                       <input

@@ -26,7 +26,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
-import { asset } from '@/lib/branding';
+import { asset, DEFAULT_COURSE_COVER } from '@/lib/branding';
 import { createLogger } from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { Textarea as UITextarea } from '@/components/ui/textarea';
@@ -43,10 +43,7 @@ import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
 import {
   StageListItem,
   deleteStageData,
-  getFirstSlideByStages,
 } from '@/lib/utils/stage-storage';
-import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
-import type { Slide } from '@/lib/types/slides';
 import { deriveLearningMode } from '@/lib/training/course-learning-mode';
 import { useMediaGenerationStore } from '@/lib/store/media-generation';
 import { toast } from 'sonner';
@@ -144,7 +141,6 @@ function HomePage() {
 
   const [error, setError] = useState<string | null>(null);
   const [classrooms, setClassrooms] = useState<StageListItem[]>([]);
-  const [thumbnails, setThumbnails] = useState<Record<string, Slide>>({});
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -177,10 +173,6 @@ function HomePage() {
       const json = await res.json();
       const list = (json.data || []) as StageListItem[];
       setClassrooms(list);
-      if (list.length > 0) {
-        const slides = await getFirstSlideByStages(list.map((c) => c.id));
-        setThumbnails(slides);
-      }
     } catch (err) {
       log.error('Failed to load classrooms:', err);
     }
@@ -742,7 +734,6 @@ function HomePage() {
                     >
                       <ClassroomCard
                         classroom={classroom}
-                        slide={thumbnails[classroom.id]}
                         formatDate={formatDate}
                         onDelete={handleDelete}
                         confirmingDelete={pendingDeleteId === classroom.id}
@@ -1060,7 +1051,6 @@ function GreetingBar() {
 // ─── Classroom Card — clean, minimal style ──────────────────────
 function ClassroomCard({
   classroom,
-  slide,
   formatDate,
   onDelete,
   confirmingDelete,
@@ -1069,7 +1059,6 @@ function ClassroomCard({
   onClick,
 }: {
   classroom: StageListItem;
-  slide?: Slide;
   formatDate: (ts: number) => string;
   onDelete: (id: string, e: React.MouseEvent) => void;
   confirmingDelete: boolean;
@@ -1078,49 +1067,20 @@ function ClassroomCard({
   onClick: () => void;
 }) {
   const { t } = useI18n();
-  const thumbRef = useRef<HTMLDivElement>(null);
-  const [thumbWidth, setThumbWidth] = useState(0);
-
-  useEffect(() => {
-    const el = thumbRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setThumbWidth(Math.round(entry.contentRect.width));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   return (
     <div className="group cursor-pointer" onClick={confirmingDelete ? undefined : onClick}>
       {/* Thumbnail — large radius, no border, subtle bg */}
-      <div
-        ref={thumbRef}
-        className="relative w-full aspect-[16/9] rounded-2xl bg-slate-100 dark:bg-slate-800/80 overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]"
-      >
-        {classroom.coverImage ? (
-          <img
-            src={classroom.coverImage}
-            alt={classroom.name}
-            className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : slide && thumbWidth > 0 ? (
-          <ThumbnailSlide
-            slide={slide}
-            size={thumbWidth}
-            viewportSize={slide.viewportSize ?? 1000}
-            viewportRatio={slide.viewportRatio ?? 0.5625}
-          />
-        ) : !slide ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="size-12 rounded-2xl bg-gradient-to-br from-violet-100 to-blue-100 dark:from-violet-900/30 dark:to-blue-900/30 flex items-center justify-center">
-              <span className="text-xl opacity-50">📄</span>
-            </div>
-          </div>
-        ) : null}
+      <div className="relative w-full aspect-[16/9] rounded-2xl bg-slate-100 dark:bg-slate-800/80 overflow-hidden transition-transform duration-200 group-hover:scale-[1.02]">
+        <img
+          src={classroom.coverImage || DEFAULT_COURSE_COVER}
+          alt={classroom.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => {
+            const img = e.target as HTMLImageElement;
+            if (!img.src.endsWith('/course-cover-default.jpg')) img.src = DEFAULT_COURSE_COVER;
+          }}
+        />
 
         {/* Delete — top-right, only on hover */}
         <AnimatePresence>
