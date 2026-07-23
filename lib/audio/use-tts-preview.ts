@@ -90,13 +90,14 @@ export function useTTSPreview() {
           return;
         }
 
-        // API-based TTS
+        // API-based TTS — always honor the provider being tested in Settings
         const body: Record<string, unknown> = {
           text: options.text,
           audioId: 'preview',
           ttsProviderId: options.providerId,
           ttsVoice: options.voice,
           ttsSpeed: options.speed,
+          useFrontendTTSConfig: true,
         };
         if (options.apiKey?.trim()) body.ttsApiKey = options.apiKey;
         if (options.baseUrl?.trim()) body.ttsBaseUrl = options.baseUrl;

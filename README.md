@@ -16,9 +16,9 @@
 
 默认角色：**成长大师兄**、陪练助教、气氛组、追问官、复盘官、杠精考官。
 
-## 运行
+## 快速启动
 
-**环境：** Node.js ≥ 20 · pnpm ≥ 10
+**环境：** Node.js ≥ 20 · pnpm ≥ 10 · Docker（本地 MySQL，可选）
 
 ```bash
 git clone https://github.com/RobertHan215/growth-mentor.git
@@ -27,16 +27,45 @@ pnpm install
 cp .env.example .env.local
 ```
 
-`.env.local` 至少配置一个 LLM：
+### 1. 配置模型（`.env.local`）
+
+推荐统一走 **阿里云百炼（DashScope）**。在 [百炼控制台](https://bailian.console.aliyun.com/) 创建 API Key 后写入：
 
 ```env
-OPENAI_API_KEY=sk-...
-# 或 ANTHROPIC_API_KEY / GOOGLE_API_KEY / DEEPSEEK_API_KEY 等
-# 可选：DEFAULT_MODEL=google:gemini-3-flash-preview
+# 一把百炼 Key 即可：LLM（qwen3.7-plus 等）+ TTS + ASR 都会用它
+QWEN_API_KEY=sk-...
+DEFAULT_MODEL=qwen:qwen3.7-plus
+
+# 可选覆盖（不填则自动回退到 QWEN_API_KEY）
+# TTS_QWEN_API_KEY=
+# ASR_QWEN_API_KEY=
 ```
+
+也可用其他厂商（`OPENAI_*` / `ANTHROPIC_*` / `GOOGLE_*` 等），见 `.env.example`。
+
+**配置落点说明：**
+
+| 项 | 位置 |
+|----|------|
+| API Key / Base URL / 默认 LLM | `.env.local`（从 `.env.example` 复制） |
+| LLM 模型列表（UI 可选） | `lib/ai/providers.ts` → `qwen.models` |
+| TTS 模型名 | `lib/audio/tts-providers.ts` → `qwen3-tts-flash` |
+| ASR 模型名 | `lib/audio/asr-providers.ts` → `qwen3-asr-flash` |
+| 运行时默认供应商（管理端） | DB `system_configs.default_provider_config` |
+
+### 2. 启动
+
+仅前端（无本地库能力时）：
 
 ```bash
 pnpm dev
+```
+
+本地完整链路（MySQL + 开发服）：
+
+```bash
+pnpm dev:local
+# 等价于：docker compose up -d mysql && next dev
 ```
 
 浏览器打开 http://localhost:3000
@@ -45,10 +74,20 @@ pnpm dev
 2. 点 **开始对练**
 3. 进入场景后参与圆桌对话
 
-生产构建：
+### 3. 生产构建
 
 ```bash
 pnpm build && pnpm start
 # 或
 docker compose up --build
 ```
+
+## 常用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 开发服务器 |
+| `pnpm dev:local` | 拉起本地 MySQL 并启动 dev |
+| `pnpm db:up` / `pnpm db:down` | 启停本地 MySQL |
+| `pnpm build` / `pnpm start` | 生产构建与运行 |
+| `pnpm test` | 单元测试 |

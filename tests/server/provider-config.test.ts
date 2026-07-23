@@ -202,4 +202,27 @@ pdf:
       expect(providers.mineru).toBeUndefined();
     });
   });
+
+  describe('QWEN_API_KEY inheritance for TTS/ASR', () => {
+    it('reuses QWEN_API_KEY for qwen-tts and qwen-asr when dedicated keys are empty', async () => {
+      vi.stubEnv('QWEN_API_KEY', 'sk-bailian');
+      const { resolveTTSApiKey, resolveASRApiKey, getServerTTSProviders, getServerASRProviders } =
+        await import('@/lib/server/provider-config');
+
+      expect(resolveTTSApiKey('qwen-tts')).toBe('sk-bailian');
+      expect(resolveASRApiKey('qwen-asr')).toBe('sk-bailian');
+      expect(getServerTTSProviders()['qwen-tts']).toBeDefined();
+      expect(getServerASRProviders()['qwen-asr']).toBeDefined();
+    });
+
+    it('prefers dedicated TTS/ASR keys over QWEN_API_KEY', async () => {
+      vi.stubEnv('QWEN_API_KEY', 'sk-bailian');
+      vi.stubEnv('TTS_QWEN_API_KEY', 'sk-tts');
+      vi.stubEnv('ASR_QWEN_API_KEY', 'sk-asr');
+      const { resolveTTSApiKey, resolveASRApiKey } = await import('@/lib/server/provider-config');
+
+      expect(resolveTTSApiKey('qwen-tts')).toBe('sk-tts');
+      expect(resolveASRApiKey('qwen-asr')).toBe('sk-asr');
+    });
+  });
 });

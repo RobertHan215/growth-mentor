@@ -235,7 +235,9 @@ async function transcribeOpenAIWhisper(
 }
 
 /**
- * Qwen ASR implementation (DashScope API - Qwen3 ASR Flash)
+ * Qwen ASR (阿里云百炼 / DashScope)
+ * Model: qwen3-asr-flash — Bailian recommended non-realtime Qwen3-ASR.
+ * Docs: https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference
  */
 async function transcribeQwenASR(
   config: ASRModelConfig,

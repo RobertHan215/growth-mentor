@@ -264,7 +264,9 @@ async function generateGLMTTS(config: TTSModelConfig, text: string): Promise<TTS
 }
 
 /**
- * Qwen TTS implementation (DashScope API - Qwen3 TTS Flash)
+ * Qwen TTS (阿里云百炼 / DashScope)
+ * Model: qwen3-tts-flash — Bailian recommended non-realtime Qwen3-TTS.
+ * Docs: https://help.aliyun.com/zh/model-studio/qwen-tts-api
  */
 async function generateQwenTTS(config: TTSModelConfig, text: string): Promise<TTSGenerationResult> {
   const baseUrl = config.baseUrl || TTS_PROVIDERS['qwen-tts'].defaultBaseUrl;

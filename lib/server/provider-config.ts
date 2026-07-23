@@ -183,11 +183,33 @@ const DEFAULT_FILENAME = 'server-providers.yml';
 /** Cache keyed by YAML filename (empty string = default file). */
 const _configs: Map<string, ServerConfig> = new Map();
 
+/** Bailian one key covers LLM + TTS + ASR; inherit QWEN_API_KEY when TTS_/ASR_ unset. */
+function inheritQwenKey(
+  section: Record<string, ServerProviderEntry>,
+  providerId: string,
+  qwenKey: string | undefined,
+): void {
+  if (!qwenKey) return;
+  if (section[providerId]?.apiKey) return;
+  if (section[providerId]) {
+    section[providerId].apiKey = qwenKey;
+    return;
+  }
+  section[providerId] = { apiKey: qwenKey };
+}
+
 function buildConfig(yamlData: YamlData): ServerConfig {
+  const providers = loadEnvSection(LLM_ENV_MAP, yamlData.providers);
+  const tts = loadEnvSection(TTS_ENV_MAP, yamlData.tts);
+  const asr = loadEnvSection(ASR_ENV_MAP, yamlData.asr);
+  const qwenKey = providers.qwen?.apiKey || process.env.QWEN_API_KEY || undefined;
+  inheritQwenKey(tts, 'qwen-tts', qwenKey);
+  inheritQwenKey(asr, 'qwen-asr', qwenKey);
+
   return {
-    providers: loadEnvSection(LLM_ENV_MAP, yamlData.providers),
-    tts: loadEnvSection(TTS_ENV_MAP, yamlData.tts),
-    asr: loadEnvSection(ASR_ENV_MAP, yamlData.asr),
+    providers,
+    tts,
+    asr,
     pdf: loadEnvSection(PDF_ENV_MAP, yamlData.pdf, { requiresBaseUrl: true }),
     image: loadEnvSection(IMAGE_ENV_MAP, yamlData.image),
     video: loadEnvSection(VIDEO_ENV_MAP, yamlData.video),

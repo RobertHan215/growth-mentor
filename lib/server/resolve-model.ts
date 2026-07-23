@@ -43,7 +43,7 @@ export function resolveModel(params: {
     rawModelString && rawModelString !== ':' && !rawModelString.endsWith(':');
   const modelString = isValidModelString
     ? rawModelString
-    : process.env.DEFAULT_MODEL || 'openai:qwen3-32b';
+    : process.env.DEFAULT_MODEL || 'qwen:qwen3.7-plus';
   const { providerId, modelId } = parseModelString(modelString);
 
   // In FORCE_SERVER_CONFIG mode, completely ignore what the client sends for
@@ -103,7 +103,7 @@ export async function resolveModelWithDefaults(params: {
     rawModelString && rawModelString !== ':' && !rawModelString.endsWith(':');
   const modelString = isValidModelString
     ? rawModelString
-    : defaultModelString || process.env.DEFAULT_MODEL || 'openai:qwen3-32b';
+    : defaultModelString || process.env.DEFAULT_MODEL || 'qwen:qwen3.7-plus';
   const { providerId, modelId } = parseModelString(modelString);
   const dbDefault =
     defaults.llm?.providerId === providerId && defaults.llm?.modelId === modelId
@@ -158,7 +158,7 @@ export async function resolveModelWithDefaults(params: {
  *
  * Solution: When the user-selected model is a Thinking VL variant AND there
  * are no images to send, silently fall back to the DEFAULT_MODEL (which is
- * a normal text model like qwen3-32b that doesn't think endlessly).
+ * a normal text model like qwen3.7-plus that doesn't think endlessly).
  *
  * Vision tasks (outline extraction with PDF images) should still use
  * resolveModelFromHeaders directly to get the VL model.
@@ -170,7 +170,7 @@ export async function resolveTextModel(req: NextRequest): Promise<ResolvedModel>
   if (!isThinkingVL) return primary;
 
   // Fall back to the server-configured text model
-  const fallbackModelString = process.env.DEFAULT_MODEL || 'openai:qwen3-32b';
+  const fallbackModelString = process.env.DEFAULT_MODEL || 'qwen:qwen3.7-plus';
   const fallback = await resolveModelWithDefaults({
     modelString: fallbackModelString,
     useModelString: true,
