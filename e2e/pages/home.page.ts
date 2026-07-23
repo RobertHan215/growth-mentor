@@ -11,7 +11,8 @@ export class HomePage {
     this.logo = page.locator('img[alt="成长大师兄"]');
     this.textarea = page.locator('textarea');
     this.enterButton = page
-      .getByRole('button', { name: /start practice|enter/i })
+      .getByRole('button', { name: /generate course|enter classroom|start practice|enter/i })
+      .or(page.locator('button:has-text("生成课程")'))
       .or(page.locator('button:has-text("生成对练")'));
   }
 

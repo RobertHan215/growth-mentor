@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowUp,
+  BookOpen,
   Check,
   ChevronDown,
   Clock,
@@ -23,6 +24,7 @@ import {
   User,
   Shield,
   Lock,
+  Swords,
   Trophy,
 } from 'lucide-react';
 import { useI18n } from '@/lib/hooks/use-i18n';
@@ -37,6 +39,8 @@ import { GenerationToolbar } from '@/components/generation/generation-toolbar';
 import { AgentBar } from '@/components/agent/agent-bar';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { nanoid } from 'nanoid';
+import { storePdfBlob } from '@/lib/utils/image-storage';
+import type { UserRequirements } from '@/lib/types/generation';
 import { useStageStore } from '@/lib/store/stage';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
@@ -85,6 +89,10 @@ function HomePage() {
   >(undefined);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [modeModalOpen, setModeModalOpen] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<'teaching' | 'oneOnOne'>('teaching');
+  const [tags, setTags] = useState<Array<{ id: string; name: string; color: string }>>([]);
+  const [selectedOneOnOneTagId, setSelectedOneOnOneTagId] = useState<string | null>(null);
 
   // Draft cache for requirement text
   const { cachedValue: cachedRequirement, updateCache: updateRequirementCache } =
@@ -187,6 +195,15 @@ function HomePage() {
     }
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    fetch(asset('/api/tags'))
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setTags(data);
+      })
+      .catch((e) => log.error('Failed to load tags:', e));
+  }, []);
+
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setPendingDeleteId(id);
@@ -263,83 +280,145 @@ function HomePage() {
       return;
     }
 
+    setModeModalOpen(true);
+  };
+
+  const handleConfirmGenerate = async () => {
+    setModeModalOpen(false);
+    const classroomMode = selectedMode;
     setError(null);
 
     try {
-      // Always one-on-one: skip mode picker + generation-preview, go straight to classroom.
-      const stageId = nanoid(10);
-      const requirement = form.requirement.trim();
-      const stageName = requirement.slice(0, 100) || '一对一对练';
-      const stage = {
-        id: stageId,
-        name: stageName,
-        // Keep full prompt so generate-prompt can use it when no PDF/scenes exist.
-        description: requirement,
-        language: form.language || 'zh-CN',
-        style: 'professional',
-        learningMode: 'oneOnOne' as const,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+      // ── One-on-one: skip generation-preview, go straight to classroom ──
+      if (classroomMode === 'oneOnOne') {
+        const stageId = nanoid(10);
+        const requirement = form.requirement.trim();
+        const stageName = requirement.slice(0, 100) || '一对一对练';
+        const stage = {
+          id: stageId,
+          name: stageName,
+          // Keep full prompt so generate-prompt can use it when no PDF/scenes exist.
+          description: requirement,
+          language: form.language || 'zh-CN',
+          style: 'professional',
+          learningMode: 'oneOnOne' as const,
+          oneOnOneTagId: selectedOneOnOneTagId || undefined,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+
+        const store = useStageStore.getState();
+        store.setStage(stage);
+        await store.saveToStorage();
+
+        let pdfText = '';
+        if (form.pdfFile) {
+          try {
+            const settings = useSettingsStore.getState();
+            const parseFormData = new FormData();
+            parseFormData.append('pdf', form.pdfFile);
+            if (settings.pdfProviderId) parseFormData.append('providerId', settings.pdfProviderId);
+            const providerCfg = settings.pdfProvidersConfig?.[settings.pdfProviderId];
+            if (providerCfg?.apiKey?.trim()) parseFormData.append('apiKey', providerCfg.apiKey);
+            if (providerCfg?.baseUrl?.trim()) parseFormData.append('baseUrl', providerCfg.baseUrl);
+            parseFormData.append('useFrontendPDFConfig', String(settings.useFrontendPDFConfig));
+
+            const parseRes = await fetch(asset('/api/parse-pdf'), {
+              method: 'POST',
+              body: parseFormData,
+            });
+            if (parseRes.ok) {
+              const parseResult = await parseRes.json();
+              if (parseResult.success && parseResult.data?.text) {
+                pdfText = (parseResult.data.text as string).slice(0, 30000);
+                log.info(`[OneOnOne] PDF parsed: ${pdfText.length} chars`);
+                store.setPdfText(pdfText);
+              }
+            }
+          } catch (pdfErr) {
+            log.warn('[OneOnOne] PDF parse failed, continuing without PDF context:', pdfErr);
+          }
+        }
+
+        try {
+          await fetch(asset('/api/db/stage'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              data: {
+                id: stageId,
+                learningMode: 'oneOnOne',
+                oneOnOneTagId: selectedOneOnOneTagId || null,
+                directorConfig: {
+                  supportedModes: ['oneOnOne'],
+                  ...(pdfText ? { pdfText } : {}),
+                },
+              },
+            }),
+          });
+        } catch (err) {
+          log.warn('Failed to save oneOnOne stage config:', err);
+        }
+
+        try {
+          localStorage.removeItem('requirementDraft');
+        } catch {
+          /* ignore */
+        }
+
+        sessionStorage.setItem('classroomSupportedModes', JSON.stringify(['oneOnOne']));
+        router.push(`/classroom/${stageId}`);
+        return;
+      }
+
+      // ── Teaching: go through generation-preview ──
+      const userProfile = useUserProfileStore.getState();
+      const requirements: UserRequirements = {
+        requirement: form.requirement,
+        language: form.language,
+        userNickname: userProfile.nickname || undefined,
+        userBio: userProfile.bio || undefined,
+        webSearch: form.webSearch || undefined,
       };
 
-      const store = useStageStore.getState();
-      store.setStage(stage);
-      await store.saveToStorage();
+      let pdfStorageKey: string | undefined;
+      let pdfFileName: string | undefined;
+      let pdfProviderId: string | undefined;
+      let pdfProviderConfig: { apiKey?: string; baseUrl?: string } | undefined;
 
-      let pdfText = '';
       if (form.pdfFile) {
-        try {
-          const settings = useSettingsStore.getState();
-          const parseFormData = new FormData();
-          parseFormData.append('pdf', form.pdfFile);
-          if (settings.pdfProviderId) parseFormData.append('providerId', settings.pdfProviderId);
-          const providerCfg = settings.pdfProvidersConfig?.[settings.pdfProviderId];
-          if (providerCfg?.apiKey?.trim()) parseFormData.append('apiKey', providerCfg.apiKey);
-          if (providerCfg?.baseUrl?.trim()) parseFormData.append('baseUrl', providerCfg.baseUrl);
-          parseFormData.append('useFrontendPDFConfig', String(settings.useFrontendPDFConfig));
+        pdfStorageKey = await storePdfBlob(form.pdfFile);
+        pdfFileName = form.pdfFile.name;
 
-          const parseRes = await fetch('/api/parse-pdf', { method: 'POST', body: parseFormData });
-          if (parseRes.ok) {
-            const parseResult = await parseRes.json();
-            if (parseResult.success && parseResult.data?.text) {
-              pdfText = (parseResult.data.text as string).slice(0, 30000);
-              log.info(`[OneOnOne] PDF parsed: ${pdfText.length} chars`);
-              store.setPdfText(pdfText);
-            }
-          }
-        } catch (pdfErr) {
-          log.warn('[OneOnOne] PDF parse failed, continuing without PDF context:', pdfErr);
+        const settings = useSettingsStore.getState();
+        pdfProviderId = settings.pdfProviderId;
+        const providerCfg = settings.pdfProvidersConfig?.[settings.pdfProviderId];
+        if (providerCfg) {
+          pdfProviderConfig = {
+            apiKey: providerCfg.apiKey,
+            baseUrl: providerCfg.baseUrl,
+          };
         }
       }
 
-      try {
-        await fetch('/api/db/stage', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'update',
-            data: {
-              id: stageId,
-              learningMode: 'oneOnOne',
-              directorConfig: {
-                supportedModes: ['oneOnOne'],
-                ...(pdfText ? { pdfText } : {}),
-              },
-            },
-          }),
-        });
-      } catch (err) {
-        log.warn('Failed to save oneOnOne stage config:', err);
-      }
+      const sessionState = {
+        sessionId: nanoid(),
+        requirements,
+        pdfText: '',
+        pdfImages: [],
+        imageStorageIds: [],
+        pdfStorageKey,
+        pdfFileName,
+        pdfProviderId,
+        pdfProviderConfig,
+        sceneOutlines: null,
+        currentStep: 'generating' as const,
+        classroomMode: 'teaching' as const,
+      };
+      sessionStorage.setItem('generationSession', JSON.stringify(sessionState));
 
-      try {
-        localStorage.removeItem('requirementDraft');
-      } catch {
-        /* ignore */
-      }
-
-      sessionStorage.setItem('classroomSupportedModes', JSON.stringify(['oneOnOne']));
-      router.push(`/classroom/${stageId}`);
+      router.push('/generation-preview');
     } catch (err) {
       log.error('Error preparing generation:', err);
       setError(err instanceof Error ? err.message : t('upload.generateFailed'));
@@ -542,6 +621,225 @@ function HomePage() {
         initialSection={settingsSection}
       />
       <PasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
+
+      {/* ═══ Mode selection modal ═══ */}
+      <AnimatePresence>
+        {modeModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center"
+          >
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setModeModalOpen(false)}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="relative w-[620px] max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200/60 dark:border-gray-700/60 overflow-hidden"
+            >
+              <div className="pt-8 pb-2 text-center">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">选择课堂模式</h3>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1.5">
+                  选择一种模式，选择后将开始生成
+                </p>
+              </div>
+
+              <div className="px-6 py-5 grid grid-cols-2 gap-4">
+                {[
+                  {
+                    id: 'teaching' as const,
+                    icon: BookOpen,
+                    title: '教学模式',
+                    subtitle: '细致讲解',
+                    desc: '按章节逐页讲解，配合 PPT 动画、讨论和板书，适合系统学习新知识',
+                    iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+                    iconColor: 'text-blue-500',
+                    subtitleColor: 'text-blue-500',
+                    selectedBorder: 'border-blue-400 dark:border-blue-500',
+                    selectedBg: 'bg-blue-50/50 dark:bg-blue-900/10',
+                    checkColor: 'bg-blue-500',
+                    features: ['PPT 动画教学', '多角色讨论', '知识点详解', '课后总结'],
+                  },
+                  {
+                    id: 'oneOnOne' as const,
+                    icon: Swords,
+                    title: '一对一对练',
+                    subtitle: '实战演练',
+                    desc: '基于课程全部内容进行角色扮演对练，附带参考话术和知识点，适合实战提升',
+                    iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+                    iconColor: 'text-amber-500',
+                    subtitleColor: 'text-amber-500',
+                    selectedBorder: 'border-amber-400 dark:border-amber-500',
+                    selectedBg: 'bg-amber-50/50 dark:bg-amber-900/10',
+                    checkColor: 'bg-amber-500',
+                    features: ['角色扮演', '参考话术', 'AI 即时评估', '知识点提炼'],
+                  },
+                ].map(
+                  ({
+                    id,
+                    icon: Icon,
+                    title,
+                    subtitle,
+                    desc,
+                    iconBg,
+                    iconColor,
+                    subtitleColor,
+                    selectedBorder,
+                    selectedBg,
+                    checkColor,
+                    features,
+                  }) => (
+                    <motion.button
+                      key={id}
+                      whileHover={{ y: -2 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setSelectedMode(id)}
+                      className={cn(
+                        'relative text-left p-5 rounded-2xl border-2 transition-all duration-200 outline-none',
+                        selectedMode === id
+                          ? `${selectedBorder} ${selectedBg} shadow-md`
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center transition-all border-2',
+                          selectedMode === id
+                            ? `${checkColor} border-transparent text-white shadow-sm`
+                            : 'border-gray-300 dark:border-gray-600',
+                        )}
+                      >
+                        {selectedMode === id && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+
+                      <div
+                        className={cn(
+                          'w-11 h-11 rounded-xl flex items-center justify-center mb-4',
+                          iconBg,
+                        )}
+                      >
+                        <Icon className={cn('w-5.5 h-5.5', iconColor)} />
+                      </div>
+
+                      <h4 className="text-base font-bold text-gray-900 dark:text-white">{title}</h4>
+                      <p className={cn('text-xs font-semibold mt-0.5', subtitleColor)}>{subtitle}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mt-3 mb-4">
+                        {desc}
+                      </p>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {features.map((f) => (
+                          <span
+                            key={f}
+                            className="px-2.5 py-0.5 bg-gray-100 dark:bg-gray-700/60 text-gray-500 dark:text-gray-400 rounded-full text-[11px] font-medium"
+                          >
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </motion.button>
+                  ),
+                )}
+              </div>
+
+              <AnimatePresence>
+                {selectedMode === 'oneOnOne' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="px-6 pb-4 overflow-hidden space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">
+                        一对一评分标准标签 (可选)
+                      </label>
+                      {selectedOneOnOneTagId && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedOneOnOneTagId(null)}
+                          className="text-[10px] text-amber-500 hover:text-amber-600 dark:hover:text-amber-400 font-medium transition-colors"
+                        >
+                          清除选择
+                        </button>
+                      )}
+                    </div>
+
+                    {tags.length === 0 ? (
+                      <div className="text-xs text-gray-400 dark:text-gray-500 py-3 text-center bg-gray-50 dark:bg-gray-800/20 rounded-xl border border-dashed border-gray-200 dark:border-gray-800/80">
+                        暂无评分标准标签，将使用默认评估维度
+                      </div>
+                    ) : (
+                      <div className="max-h-[130px] overflow-y-auto pr-1 grid grid-cols-2 gap-2">
+                        {tags.map((tag) => {
+                          const isSelected = selectedOneOnOneTagId === tag.id;
+                          const hex = tag.color || '#E2E8F0';
+                          const light = (() => {
+                            if (!hex.startsWith('#')) return hex;
+                            const r = parseInt(hex.slice(1, 3), 16);
+                            const g = parseInt(hex.slice(3, 5), 16);
+                            const b = parseInt(hex.slice(5, 7), 16);
+                            return `rgba(${r}, ${g}, ${b}, 0.08)`;
+                          })();
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() => setSelectedOneOnOneTagId(isSelected ? null : tag.id)}
+                              style={{
+                                backgroundColor: isSelected ? light : undefined,
+                                borderColor: isSelected ? hex : undefined,
+                              }}
+                              className={cn(
+                                'flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all duration-200 text-xs',
+                                isSelected
+                                  ? 'text-slate-800 dark:text-white font-semibold'
+                                  : 'bg-gray-50/50 dark:bg-gray-800/30 border-gray-200 dark:border-gray-800/80 text-gray-600 dark:text-gray-400',
+                              )}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: hex }}
+                              />
+                              <span className="truncate flex-1">{tag.name}</span>
+                              {isSelected && (
+                                <span className="text-[10px] text-emerald-500 font-bold shrink-0">✓</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="px-6 pb-6 pt-1 flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setModeModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmGenerate}
+                  className="px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md hover:shadow-lg active:scale-95"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                  开始生成
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ═══ Education Background ═══ */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10 bg-slate-50 dark:bg-[#0a0a0f]">

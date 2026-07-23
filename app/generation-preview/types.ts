@@ -25,6 +25,17 @@ export interface GenerationSessionState {
   // Web search context
   researchContext?: string;
   researchSources?: Array<{ title: string; url: string }>;
+  // Classroom mode selection from home modal
+  classroomMode?: 'both' | 'teaching' | 'oneOnOne';
+  oneOnOneTagId?: string | null;
+}
+
+export type ClassroomMode = 'both' | 'teaching' | 'oneOnOne';
+
+export function getSupportedModesForClassroomMode(
+  classroomMode: ClassroomMode,
+): ('teaching' | 'oneOnOne')[] {
+  return classroomMode === 'both' ? ['teaching', 'oneOnOne'] : [classroomMode];
 }
 
 export type GenerationStep = {

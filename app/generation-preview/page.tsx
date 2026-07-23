@@ -33,7 +33,12 @@ import type { SceneOutline, PdfImage, ImageMapping } from '@/lib/types/generatio
 import { AgentRevealModal } from '@/components/agent/agent-reveal-modal';
 import { createLogger } from '@/lib/logger';
 import { asset } from '@/lib/branding';
-import { type GenerationSessionState, ALL_STEPS, getActiveSteps } from './types';
+import {
+  type GenerationSessionState,
+  ALL_STEPS,
+  getActiveSteps,
+  getSupportedModesForClassroomMode,
+} from './types';
 import { StepVisualizer } from './components/visualizers';
 
 const log = createLogger('GenerationPreview');
@@ -789,7 +794,34 @@ function GenerationPreviewContent() {
         }),
       );
 
+      const classroomMode = currentSession.classroomMode || 'teaching';
+      const supportedModes = getSupportedModesForClassroomMode(classroomMode);
+      const learningMode = classroomMode === 'oneOnOne' ? 'oneOnOne' : 'teaching';
+
+      try {
+        await fetch(asset('/api/db/stage'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            data: {
+              id: stage.id,
+              learningMode,
+              directorConfig: { supportedModes },
+            },
+          }),
+        });
+      } catch (err) {
+        log.warn('Failed to save classroom mode config:', err);
+      }
+
+      store.setStage({
+        ...stage,
+        learningMode,
+      });
+
       sessionStorage.removeItem('generationSession');
+      sessionStorage.setItem('classroomSupportedModes', JSON.stringify(supportedModes));
       await store.saveToStorage();
       router.push(`/classroom/${stage.id}`);
     } catch (err) {

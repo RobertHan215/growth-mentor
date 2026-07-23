@@ -25,8 +25,9 @@ test.describe('Home → Generation', () => {
     await home.fillRequirement('讲解光合作用');
     await expect(home.enterButton).toBeEnabled();
 
-    // Submit → navigate to generation-preview
+    // Submit → mode modal → teaching (default) → generation-preview
     await home.submit();
+    await page.getByRole('button', { name: '开始生成' }).click();
     await page.waitForURL(/\/generation-preview/);
     expect(page.url()).toContain('/generation-preview');
   });
