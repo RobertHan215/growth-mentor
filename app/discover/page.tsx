@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Compass, BookOpenCheck, Swords } from 'lucide-react';
+import { ArrowLeft, BookOpen, Compass, BookOpenCheck, Swords } from 'lucide-react';
 import { APP_NAME, APP_LOGO } from '@/lib/branding';
 import { getFirstSlideByStages } from '@/lib/utils/stage-storage';
 import { ThumbnailSlide } from '@/components/slide-renderer/components/ThumbnailSlide';
@@ -62,14 +62,20 @@ export default function DiscoverPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <header className="fixed top-0 inset-x-0 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 z-50 px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={APP_LOGO} alt={APP_NAME} className="h-8" />
-          <nav className="hidden md:flex ml-6 items-center gap-6">
-            <button
-              onClick={() => router.push('/discover')}
-              className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-500"
-            >
+          <button
+            onClick={() => router.push('/')}
+            className="shrink-0 p-2 -ml-2 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            title="返回首页"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <button onClick={() => router.push('/')} className="shrink-0">
+            <img src={APP_LOGO} alt={APP_NAME} className="h-8" />
+          </button>
+          <nav className="flex ml-2 md:ml-6 items-center gap-4 md:gap-6">
+            <span className="flex items-center gap-2 text-sm font-medium text-red-600 dark:text-red-500">
               <Compass className="w-4 h-4" /> 发现课堂
-            </button>
+            </span>
             <button
               onClick={() => router.push('/')}
               className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 transition"
