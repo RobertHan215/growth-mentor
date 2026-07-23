@@ -69,9 +69,10 @@ next-env.d.ts
 /data
 /logs
 
-# docs (ADRs are kept in git)
+# docs (ADRs and scenario designs are kept in git)
 /docs/*
 !/docs/adr/
+!/docs/scenarios/
 tmp/
 
 # agent tooling state
