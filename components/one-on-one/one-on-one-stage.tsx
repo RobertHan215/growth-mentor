@@ -578,8 +578,8 @@ export function OneOnOneStage({ onSwitchMode: _onSwitchMode }: OneOnOneStageProp
           ? freshPdfText.slice(0, 12000)
           : getFullCourseContent();
       if (!courseContent) {
-        courseContent = stage.name || '一对一对练';
-        log.info('[OneOnOne] No scenes found, using stage name as course content');
+        courseContent = stage.description?.trim() || stage.name || '一对一对练';
+        log.info('[OneOnOne] No scenes found, using stage description/name as course content');
       }
 
       const stageId = stage.id;
@@ -1843,7 +1843,8 @@ ${weaknesses.slice(0, 3).map((w) => `- ${w.name}：${w.description}。引导点�
     setIsRegenerating(true);
 
     try {
-      const courseContent = getFullCourseContent() || stage?.name || '一对一对练';
+      const courseContent =
+        getFullCourseContent() || stage.description?.trim() || stage.name || '一对一对练';
       const res = await fetch('/api/training/generate-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

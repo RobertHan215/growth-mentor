@@ -37,8 +37,7 @@ import { GenerationToolbar } from '@/components/generation/generation-toolbar';
 import { AgentBar } from '@/components/agent/agent-bar';
 import { useTheme } from '@/lib/hooks/use-theme';
 import { nanoid } from 'nanoid';
-import { storePdfBlob } from '@/lib/utils/image-storage';
-import type { UserRequirements } from '@/lib/types/generation';
+import { useStageStore } from '@/lib/store/stage';
 import { useSettingsStore } from '@/lib/store/settings';
 import { useUserProfileStore, AVATAR_OPTIONS } from '@/lib/store/user-profile';
 import {
@@ -275,51 +274,80 @@ function HomePage() {
     setError(null);
 
     try {
-      const userProfile = useUserProfileStore.getState();
-      const requirements: UserRequirements = {
-        requirement: form.requirement,
-        language: form.language,
-        userNickname: userProfile.nickname || undefined,
-        userBio: userProfile.bio || undefined,
-        webSearch: form.webSearch || undefined,
+      // Always one-on-one: skip mode picker + generation-preview, go straight to classroom.
+      const stageId = nanoid(10);
+      const requirement = form.requirement.trim();
+      const stageName = requirement.slice(0, 100) || '一对一对练';
+      const stage = {
+        id: stageId,
+        name: stageName,
+        // Keep full prompt so generate-prompt can use it when no PDF/scenes exist.
+        description: requirement,
+        language: form.language || 'zh-CN',
+        style: 'professional',
+        learningMode: 'oneOnOne' as const,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
-      let pdfStorageKey: string | undefined;
-      let pdfFileName: string | undefined;
-      let pdfProviderId: string | undefined;
-      let pdfProviderConfig: { apiKey?: string; baseUrl?: string } | undefined;
+      const store = useStageStore.getState();
+      store.setStage(stage);
+      await store.saveToStorage();
 
+      let pdfText = '';
       if (form.pdfFile) {
-        pdfStorageKey = await storePdfBlob(form.pdfFile);
-        pdfFileName = form.pdfFile.name;
+        try {
+          const settings = useSettingsStore.getState();
+          const parseFormData = new FormData();
+          parseFormData.append('pdf', form.pdfFile);
+          if (settings.pdfProviderId) parseFormData.append('providerId', settings.pdfProviderId);
+          const providerCfg = settings.pdfProvidersConfig?.[settings.pdfProviderId];
+          if (providerCfg?.apiKey?.trim()) parseFormData.append('apiKey', providerCfg.apiKey);
+          if (providerCfg?.baseUrl?.trim()) parseFormData.append('baseUrl', providerCfg.baseUrl);
+          parseFormData.append('useFrontendPDFConfig', String(settings.useFrontendPDFConfig));
 
-        const settings = useSettingsStore.getState();
-        pdfProviderId = settings.pdfProviderId;
-        const providerCfg = settings.pdfProvidersConfig?.[settings.pdfProviderId];
-        if (providerCfg) {
-          pdfProviderConfig = {
-            apiKey: providerCfg.apiKey,
-            baseUrl: providerCfg.baseUrl,
-          };
+          const parseRes = await fetch('/api/parse-pdf', { method: 'POST', body: parseFormData });
+          if (parseRes.ok) {
+            const parseResult = await parseRes.json();
+            if (parseResult.success && parseResult.data?.text) {
+              pdfText = (parseResult.data.text as string).slice(0, 30000);
+              log.info(`[OneOnOne] PDF parsed: ${pdfText.length} chars`);
+              store.setPdfText(pdfText);
+            }
+          }
+        } catch (pdfErr) {
+          log.warn('[OneOnOne] PDF parse failed, continuing without PDF context:', pdfErr);
         }
       }
 
-      const sessionState = {
-        sessionId: nanoid(),
-        requirements,
-        pdfText: '',
-        pdfImages: [],
-        imageStorageIds: [],
-        pdfStorageKey,
-        pdfFileName,
-        pdfProviderId,
-        pdfProviderConfig,
-        sceneOutlines: null,
-        currentStep: 'generating' as const,
-      };
-      sessionStorage.setItem('generationSession', JSON.stringify(sessionState));
+      try {
+        await fetch('/api/db/stage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update',
+            data: {
+              id: stageId,
+              learningMode: 'oneOnOne',
+              directorConfig: {
+                supportedModes: ['oneOnOne'],
+                ...(pdfText ? { pdfText } : {}),
+              },
+            },
+          }),
+        });
+      } catch (err) {
+        log.warn('Failed to save oneOnOne stage config:', err);
+      }
 
-      router.push('/generation-preview');
+      try {
+        localStorage.removeItem('requirementDraft');
+      } catch {
+        /* ignore */
+      }
+
+      sessionStorage.setItem('classroomSupportedModes', JSON.stringify(['oneOnOne']));
+      router.push(`/classroom/${stageId}`);
     } catch (err) {
       log.error('Error preparing generation:', err);
       setError(err instanceof Error ? err.message : t('upload.generateFailed'));
